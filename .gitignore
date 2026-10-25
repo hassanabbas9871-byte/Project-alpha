@@ -1,0 +1,14 @@
+# Generated builds can always be recreated from source with CMake.
+/build/
+/build-*/
+/cmake-build-*/
+
+# IDE and operating-system files describe one person's machine.
+/.vs/
+/.idea/
+.DS_Store
+Thumbs.db
+
+# Screenshots and logs produced while testing the game are local artifacts.
+/afterlight.png
+*.log

@@ -53,13 +53,13 @@ void resizeCanvas(sf::RenderWindow& window, unsigned width, unsigned height) {
     if (width == 0 || height == 0) return; // Minimized windows can have no area.
     const float ratio = static_cast<float>(width) / static_cast<float>(height);
     constexpr float desired = ViewWidth / ViewHeight;
-    sf::View view(sf::FloatRect(0, 0, ViewWidth, ViewHeight));
+    sf::View view(sf::FloatRect({0, 0}, {ViewWidth, ViewHeight}));
     if (ratio > desired) {
         const float fraction = desired / ratio;
-        view.setViewport({(1 - fraction) / 2, 0, fraction, 1});
+        view.setViewport({{(1 - fraction) / 2, 0}, {fraction, 1}});
     } else {
         const float fraction = ratio / desired;
-        view.setViewport({0, (1 - fraction) / 2, 1, fraction});
+        view.setViewport({{0, (1 - fraction) / 2}, {1, fraction}});
     }
     window.setView(view);
 }
@@ -68,14 +68,14 @@ void resizeCanvas(sf::RenderWindow& window, unsigned width, unsigned height) {
 // so a quick tap is remembered even if rendering happens between physics ticks.
 Input heldInput() {
     Input input;
-    const bool left = sf::Keyboard::isKeyPressed(sf::Keyboard::A)
-                   || sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
-    const bool right = sf::Keyboard::isKeyPressed(sf::Keyboard::D)
-                    || sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
+    const bool left = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::A)
+                   || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left);
+    const bool right = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::D)
+                    || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right);
     input.horizontal = static_cast<float>(right) - static_cast<float>(left);
-    input.jumpHeld = sf::Keyboard::isKeyPressed(sf::Keyboard::Space)
-                  || sf::Keyboard::isKeyPressed(sf::Keyboard::W)
-                  || sf::Keyboard::isKeyPressed(sf::Keyboard::Up);
+    input.jumpHeld = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)
+                  || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::W)
+                  || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
     return input;
 }
 
@@ -110,9 +110,9 @@ int main(int argc, char* argv[]) {
 
         const bool automated = options.smokeTest || !options.screenshot.empty();
         sf::ContextSettings settings;
-        settings.antialiasingLevel = 4; // Smooth diagonal edges on supported GPUs.
-        sf::RenderWindow window(sf::VideoMode(1280, 720), "AFTERLIGHT / Rooftop Runner",
-                                sf::Style::Default, settings);
+        settings.antiAliasingLevel = 4; // Smooth diagonal edges on supported GPUs.
+        sf::RenderWindow window(sf::VideoMode({1280, 720}), "AFTERLIGHT / Rooftop Runner",
+                                sf::Style::Default, sf::State::Windowed, settings);
         window.setKeyRepeatEnabled(false); // One jump per press, not per key-repeat.
         window.setVerticalSyncEnabled(!automated);
         if (!automated) window.setFramerateLimit(144); // Avoid an uncapped busy loop.
@@ -148,41 +148,46 @@ int main(int argc, char* argv[]) {
             ui.visualTime += frameTime;
             ui.fps += ((1.f / max(frameTime, .00001f)) - ui.fps) * .08f;
 
-            sf::Event event{};
-            while (window.pollEvent(event)) {
-                if (event.type == sf::Event::Closed) window.close();
-                if (event.type == sf::Event::Resized) resizeCanvas(window, event.size.width, event.size.height);
-                if (event.type == sf::Event::LostFocus && ui.screen == Screen::Playing && !automated)
+            // SFML 3 returns an optional event: it either contains one event,
+            // or is empty when the queue is exhausted. is<T>() checks its type;
+            // getIf<T>() gives access to that type's data only when it matches.
+            while (const auto event = window.pollEvent()) {
+                if (event->is<sf::Event::Closed>()) { window.close(); break; }
+                if (const auto* resized = event->getIf<sf::Event::Resized>())
+                    resizeCanvas(window, resized->size.x, resized->size.y);
+                if (event->is<sf::Event::FocusLost>() && ui.screen == Screen::Playing && !automated)
                     ui.screen = Screen::Paused;
 
                 // Clicking the visible start/resume button is also supported.
-                if (event.type == sf::Event::MouseButtonPressed && event.mouseButton.button == sf::Mouse::Left) {
-                    const auto click = window.mapPixelToCoords({event.mouseButton.x, event.mouseButton.y});
-                    if (ui.screen == Screen::Title && sf::FloatRect(54, 470, 250, 57).contains(click)) {
+                if (const auto* mouse = event->getIf<sf::Event::MouseButtonPressed>();
+                    mouse && mouse->button == sf::Mouse::Button::Left) {
+                    const auto click = window.mapPixelToCoords(mouse->position);
+                    if (ui.screen == Screen::Title && sf::FloatRect({54, 470}, {250, 57}).contains(click)) {
                         world.reset();
                         ui.screen = Screen::Playing;
-                    } else if (sf::FloatRect(414, 461, 452, 53).contains(click)) {
+                    } else if (sf::FloatRect({414, 461}, {452, 53}).contains(click)) {
                         if (ui.screen == Screen::Paused) ui.screen = Screen::Playing;
                         else if (ui.screen == Screen::Finished) { world.reset(); ui.screen = Screen::Playing; }
                     }
                 }
-                if (event.type != sf::Event::KeyPressed) continue;
-                const auto key = event.key.code;
-                if (key == sf::Keyboard::M) { audio.setMuted(!audio.muted()); ui.muted = audio.muted(); }
-                if (key == sf::Keyboard::F3) ui.showStats = !ui.showStats;
-                if (key == sf::Keyboard::Escape) {
+                const auto* keyPress = event->getIf<sf::Event::KeyPressed>();
+                if (!keyPress) continue;
+                const auto key = keyPress->code;
+                if (key == sf::Keyboard::Key::M) { audio.setMuted(!audio.muted()); ui.muted = audio.muted(); }
+                if (key == sf::Keyboard::Key::F3) ui.showStats = !ui.showStats;
+                if (key == sf::Keyboard::Key::Escape) {
                     if (ui.screen == Screen::Playing) ui.screen = Screen::Paused;
                     else if (ui.screen == Screen::Paused) ui.screen = Screen::Playing;
-                    else if (ui.screen == Screen::Title) window.close();
+                    else if (ui.screen == Screen::Title) { window.close(); break; }
                 }
-                if (key == sf::Keyboard::Enter && ui.screen != Screen::Playing) {
+                if (key == sf::Keyboard::Key::Enter && ui.screen != Screen::Playing) {
                     world.reset();
                     ui.screen = Screen::Playing;
                 }
                 if (ui.screen == Screen::Playing) {
-                    if (key == sf::Keyboard::Space || key == sf::Keyboard::W || key == sf::Keyboard::Up) pendingJump = true;
-                    if (key == sf::Keyboard::LShift || key == sf::Keyboard::RShift || key == sf::Keyboard::X) pendingDash = true;
-                    if (key == sf::Keyboard::R) pendingRetry = true;
+                    if (key == sf::Keyboard::Key::Space || key == sf::Keyboard::Key::W || key == sf::Keyboard::Key::Up) pendingJump = true;
+                    if (key == sf::Keyboard::Key::LShift || key == sf::Keyboard::Key::RShift || key == sf::Keyboard::Key::X) pendingDash = true;
+                    if (key == sf::Keyboard::Key::R) pendingRetry = true;
                 }
             }
             if (!window.isOpen()) break;
@@ -231,7 +236,7 @@ int main(int argc, char* argv[]) {
                 // Reading the actual window pixels tests font loading, drawing,
                 // OpenGL, and the image encoder rather than just an open port.
                 sf::Texture capture;
-                if (!capture.create(window.getSize().x, window.getSize().y))
+                if (!capture.resize(window.getSize()))
                     throw runtime_error("Could not allocate a screenshot texture.");
                 capture.update(window);
                 if (!capture.copyToImage().saveToFile(options.screenshot.string()))

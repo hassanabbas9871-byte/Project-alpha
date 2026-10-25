@@ -1,13 +1,14 @@
 # CMake is a build organizer: it tells your compiler which files make the game,
 # which C++ language version to use, and which external libraries to link.
 cmake_minimum_required(VERSION 3.20)
-project(Afterlight VERSION 1.0.0 LANGUAGES CXX)
+project(Afterlight VERSION 2.0.0 LANGUAGES CXX)
 
 # SFML handles the operating-system details of graphics, windows, and sound.
-# This project deliberately uses the SFML 2 API. SFML 3 has a different API.
-find_package(SFML 2.5 COMPONENTS graphics window system audio REQUIRED)
-if(DEFINED SFML_VERSION AND SFML_VERSION VERSION_GREATER_EQUAL 3)
-    message(FATAL_ERROR "Afterlight needs SFML 2.5 or 2.6, not SFML 3.")
+# This source uses SFML 3.1: capitalized component names and SFML:: targets
+# are part of its CMake interface. An older installed SFML will fail clearly.
+find_package(SFML 3.1 COMPONENTS Graphics Window System Audio REQUIRED)
+if(SFML_VERSION VERSION_GREATER_EQUAL 4)
+    message(FATAL_ERROR "Afterlight supports SFML 3.1 and later 3.x releases, not SFML 4.")
 endif()
 
 # Each .cpp file is compiled separately, then the linker combines them into
@@ -24,7 +25,7 @@ target_include_directories(afterlight PRIVATE include)
 # Disabling extensions keeps the code portable between standard compilers.
 target_compile_features(afterlight PRIVATE cxx_std_23)
 set_target_properties(afterlight PROPERTIES CXX_EXTENSIONS OFF)
-target_link_libraries(afterlight PRIVATE sfml-graphics sfml-window sfml-system sfml-audio)
+target_link_libraries(afterlight PRIVATE SFML::Graphics SFML::Window SFML::System SFML::Audio)
 
 # Warnings point out suspicious code while learning; they are not runtime
 # errors. Different compiler families spell their warning switches differently.
@@ -45,6 +46,10 @@ add_custom_command(TARGET afterlight POST_BUILD
         "$<TARGET_FILE_DIR:afterlight>/assets"
     COMMENT "Copying the bundled font and its license beside Afterlight"
 )
+
+# Windows UCRT64 users run through scripts/run-ucrt64.bat, which supplies
+# the matching SFML and GCC runtime DLLs through PATH. Copying only SFML DLLs
+# would miss transitive DLL dependencies, so we do not pretend to package them.
 
 # CTest runs the game's own physics checks. These do not open a window, so
 # they can also run on a server with no monitor or graphics session.

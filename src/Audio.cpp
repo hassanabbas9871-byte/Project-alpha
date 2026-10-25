@@ -6,7 +6,9 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <numbers>
+#include <optional>
 #include <vector>
 
 // This beginner-friendly shortcut lets us write vector instead of std::vector.
@@ -37,10 +39,10 @@ enum SoundId : size_t {
 // Build one little instrument. A tone can glide between pitches, contain a
 // chord (several simultaneous notes), and mix in a little filtered-sounding
 // noise for the dash. Everything is deterministic, so every run sounds alike.
-vector<sf::Int16> synthesize(const vector<double>& frequencies, double seconds,
+vector<int16_t> synthesize(const vector<double>& frequencies, double seconds,
                             double endPitch = 1.0, double noiseAmount = 0.0) {
     const size_t sampleCount = static_cast<size_t>(seconds * SampleRate);
-    vector<sf::Int16> samples(sampleCount);
+    vector<int16_t> samples(sampleCount);
     vector<double> phases(frequencies.size(), 0.0);
     unsigned randomState = 0x51A7u;
 
@@ -73,7 +75,7 @@ vector<sf::Int16> synthesize(const vector<double>& frequencies, double seconds,
 
         // SFML expects signed 16-bit samples: values between -32768 and 32767.
         // A generous margin prevents clipping when several sounds overlap.
-        samples[index] = static_cast<sf::Int16>(clamp(wave * envelope * 13500.0,
+        samples[index] = static_cast<int16_t>(clamp(wave * envelope * 13500.0,
                                                     -32767.0, 32767.0));
     }
     return samples;
@@ -85,7 +87,9 @@ struct Audio::Impl {
     // Declaration order matters! C++ destroys members in reverse order.
     // Sounds therefore disappear BEFORE the buffers they refer to.
     array<sf::SoundBuffer, SoundCount> buffers;
-    array<sf::Sound, 16> voices;
+    // SFML 3 requires each Sound to start with a buffer. optional lets us
+    // leave each voice empty until the generated buffers are ready.
+    array<optional<sf::Sound>, 16> voices;
     size_t nextVoice = 0;
     size_t nextNote = 0;
     float musicCountdown = 0.0f;
@@ -99,7 +103,7 @@ struct Audio::Impl {
                                  double noise = 0.0) {
             const auto samples = synthesize(notes, duration, glide, noise);
             if (!buffers[id].loadFromSamples(samples.data(), samples.size(),
-                                             1, SampleRate)) {
+                                             1, SampleRate, {sf::SoundChannel::Mono})) {
                 valid = false;
             }
         };
@@ -119,11 +123,15 @@ struct Audio::Impl {
         for (size_t index = 0; index < notes.size(); ++index) {
             load(FirstMusicNote + index, {notes[index]}, 0.72);
         }
+        // emplace constructs each Sound directly inside its optional slot.
+        if (valid) {
+            for (auto& voice : voices) voice.emplace(buffers[JumpSound]);
+        }
     }
 
     void stop() {
         for (auto& voice : voices) {
-            voice.stop();
+            if (voice) voice->stop();
         }
     }
 
@@ -137,12 +145,12 @@ struct Audio::Impl {
         size_t chosen = nextVoice;
         for (size_t offset = 0; offset < voices.size(); ++offset) {
             const size_t candidate = (nextVoice + offset) % voices.size();
-            if (voices[candidate].getStatus() == sf::Sound::Stopped) {
+            if (voices[candidate]->getStatus() == sf::SoundSource::Status::Stopped) {
                 chosen = candidate;
                 break;
             }
         }
-        auto& voice = voices[chosen];
+        auto& voice = *voices[chosen];
         voice.stop();
         voice.setBuffer(buffers[soundId]);
         voice.setVolume(volume); // SFML volume ranges from 0 (silent) to 100.

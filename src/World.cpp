@@ -30,7 +30,8 @@ float approach(float value, float target, float amount) {
 }
 
 sf::FloatRect body(const Player& player) {
-    return {player.position.x, player.position.y, player.size.x, player.size.y};
+    // SFML 3 rectangles contain two vectors: the top-left position and size.
+    return {player.position, player.size};
 }
 
 sf::Vector2f center(const Player& player) {
@@ -63,7 +64,7 @@ void World::reset() {
     // readable: x, top y, width, and an optional moving-platform flag.
     auto roof = [this](float x, float y, float width, bool moving = false,
                        float phase = 0.f) {
-        platforms.push_back({{x, y, width, moving ? 22.f : 800.f - y},
+        platforms.push_back({{{x, y}, {width, moving ? 22.f : 800.f - y}},
                              moving, {x, y}, phase});
     };
 
@@ -96,10 +97,10 @@ void World::reset() {
 
     // Hazards sit on top of roofs. Their collision boxes are slightly inset
     // from the drawn spikes, which makes close successful jumps feel fair.
-    hazards = {{{448, 588, 58, 22}}, {{1740, 573, 70, 22}},
-               {{3430, 558, 72, 22}}, {{4520, 548, 66, 22}},
-               {{5540, 528, 80, 22}}, {{6590, 523, 64, 22}},
-               {{7080, 573, 76, 22}}};
+    hazards = {{{{448, 588}, {58, 22}}}, {{{1740, 573}, {70, 22}}},
+               {{{3430, 558}, {72, 22}}}, {{{4520, 548}, {66, 22}}},
+               {{{5540, 528}, {80, 22}}}, {{{6590, 523}, {64, 22}}},
+               {{{7080, 573}, {76, 22}}}};
 
     // Orbs encourage optional high lines; touching one restores your dash even
     // in midair, so an experienced player can chain a faster route.
@@ -192,10 +193,10 @@ void World::update(float dt, const Input& input) {
     for (size_t i = 0; i < platforms.size(); ++i) {
         auto& platform = platforms[i];
         if (!platform.moving) continue;
-        const float oldY = platform.bounds.top;
-        platform.bounds.top = platform.origin.y + sin(elapsed * 1.6f + platform.phase) * 42.f;
+        const float oldY = platform.bounds.position.y;
+        platform.bounds.position.y = platform.origin.y + sin(elapsed * 1.6f + platform.phase) * 42.f;
         if (player.grounded && standingPlatform_ == static_cast<int>(i)) {
-            player.position.y += platform.bounds.top - oldY;
+            player.position.y += platform.bounds.position.y - oldY;
         }
     }
 
@@ -262,18 +263,19 @@ void World::update(float dt, const Input& input) {
     player.onWall = false;
     player.wallDirection = 0;
     player.position.x += player.velocity.x * dt;
+    // findIntersection returns an optional rectangle: no value means no overlap.
     for (const auto& platform : platforms) {
-        if (!body(player).intersects(platform.bounds)) continue;
+        if (!body(player).findIntersection(platform.bounds)) continue;
         // A lift may rise a fraction of a pixel into falling feet before this
         // horizontal pass. Leave that shallow contact for the vertical pass;
         // otherwise landing on an ascending lift could push us off its side.
         if (player.velocity.y >= 0.f && player.position.y + player.size.y
-            <= platform.bounds.top + 2.f) continue;
+            <= platform.bounds.position.y + 2.f) continue;
         if (player.velocity.x > 0.f) {
-            player.position.x = platform.bounds.left - player.size.x;
+            player.position.x = platform.bounds.position.x - player.size.x;
             player.wallDirection = 1;
         } else if (player.velocity.x < 0.f) {
-            player.position.x = platform.bounds.left + platform.bounds.width;
+            player.position.x = platform.bounds.position.x + platform.bounds.size.x;
             player.wallDirection = -1;
         }
         if (player.wallDirection != 0) {
@@ -293,15 +295,15 @@ void World::update(float dt, const Input& input) {
     player.position.y += player.velocity.y * dt;
     for (size_t i = 0; i < platforms.size(); ++i) {
         const auto& platform = platforms[i];
-        if (!body(player).intersects(platform.bounds)) continue;
+        if (!body(player).findIntersection(platform.bounds)) continue;
         if (player.velocity.y >= 0.f) {
-            player.position.y = platform.bounds.top - player.size.y;
+            player.position.y = platform.bounds.position.y - player.size.y;
             player.grounded = true;
             standingPlatform_ = static_cast<int>(i);
             player.velocity.y = 0.f;
             if (player.dashTime <= 0.f) player.dashReady = true;
         } else {
-            player.position.y = platform.bounds.top + platform.bounds.height;
+            player.position.y = platform.bounds.position.y + platform.bounds.size.y;
             player.velocity.y = 0.f;
         }
     }
@@ -313,7 +315,7 @@ void World::update(float dt, const Input& input) {
     // The player's collision body remains an honest rectangle. Only the drawn
     // character squashes and stretches; animation never changes collision size.
     for (const auto& hazard : hazards) {
-        if (body(player).intersects(hazard.bounds)) {
+        if (body(player).findIntersection(hazard.bounds)) {
             die();
             return;
         }
@@ -372,7 +374,7 @@ bool runSelfTests() {
     };
     auto flat = [&]() {
         World world;
-        world.platforms = {{{0, 610, 7600, 200}, false, {0, 610}, 0}};
+        world.platforms = {{{{0, 610}, {7600, 200}}, false, {0, 610}, 0}};
         world.hazards.clear();
         world.orbs.clear();
         world.checkpoints.clear();
@@ -411,7 +413,7 @@ bool runSelfTests() {
     // Start a fresh airborne world, so there is no leftover coyote grace
     // period that could accidentally turn this into an ordinary jump test.
     World buffered;
-    buffered.platforms = {{{0, 610, 7600, 200}, false, {0, 610}, 0}};
+    buffered.platforms = {{{{0, 610}, {7600, 200}}, false, {0, 610}, 0}};
     buffered.hazards.clear();
     buffered.orbs.clear();
     buffered.checkpoints.clear();
@@ -434,11 +436,11 @@ bool runSelfTests() {
 
     // Use a fresh airborne player so this tests wall grace, not floor grace.
     World wall;
-    wall.platforms = {{{0, 610, 7600, 200}, false, {0, 610}, 0}};
+    wall.platforms = {{{{0, 610}, {7600, 200}}, false, {0, 610}, 0}};
     wall.hazards.clear();
     wall.orbs.clear();
     wall.checkpoints.clear();
-    wall.platforms.push_back({{250, 300, 70, 310}, false, {250, 300}, 0});
+    wall.platforms.push_back({{{250, 300}, {70, 310}}, false, {250, 300}, 0});
     wall.player.position = {222, 390};
     wall.player.velocity = {300, 250};
     wall.player.grounded = false;
@@ -450,16 +452,16 @@ bool runSelfTests() {
           "wall jump pushes upward and away from the wall");
 
     World lift = flat();
-    lift.platforms = {{{0, 530, 500, 22}, true, {0, 530}, 0}};
+    lift.platforms = {{{{0, 530}, {500, 22}}, true, {0, 530}, 0}};
     lift.player.position = {110, 400};
     lift.player.grounded = false;
     advance(lift, 240);
     check(lift.player.grounded && abs(lift.player.position.y + 42.f
-          - lift.platforms.front().bounds.top) < 0.1f,
+          - lift.platforms.front().bounds.position.y) < 0.1f,
           "moving lift carries a standing player without sinking");
 
     World risingLift;
-    risingLift.platforms = {{{0, 530, 500, 22}, true, {0, 530}, 3.14f}};
+    risingLift.platforms = {{{{0, 530}, {500, 22}}, true, {0, 530}, 3.14f}};
     risingLift.hazards.clear();
     risingLift.orbs.clear();
     risingLift.checkpoints.clear();
@@ -486,7 +488,7 @@ bool runSelfTests() {
           "falling respawns at the activated checkpoint");
 
     World spikes = flat();
-    spikes.hazards = {{{110, 590, 26, 20}}};
+    spikes.hazards = {{{{110, 590}, {26, 20}}}};
     spikes.update(dt, {});
     check(spikes.deaths == 1, "spike collision records a death and respawns");
 
@@ -508,21 +510,21 @@ bool runSelfTests() {
                 World trial;
                 trial.elapsed = startingTime;
                 for (auto& platform : trial.platforms) {
-                    if (platform.moving) platform.bounds.top = platform.origin.y
+                    if (platform.moving) platform.bounds.position.y = platform.origin.y
                         + sin(startingTime * 1.6f + platform.phase) * 42.f;
                 }
                 const auto source = trial.platforms[index].bounds;
                 // Begin just above the last 100 pixels of the source roof;
                 // normal collision code must settle onto it before takeoff.
-                trial.player.position = {source.left + source.width - 100.f,
-                                         source.top - 45.f};
+                trial.player.position = {source.position.x + source.size.x - 100.f,
+                                         source.position.y - 45.f};
                 trial.player.velocity.x = RunSpeed;
                 bool jumped = false;
                 int stepsAfterJump = 0;
                 for (int step = 0; step < 220; ++step) {
                     Input control{.horizontal = 1.f, .jumpHeld = true};
                     if (!jumped && trial.player.position.x + trial.player.size.x
-                        >= source.left + source.width - lead) {
+                        >= source.position.x + source.size.x - lead) {
                         control.jumpPressed = true;
                         jumped = true;
                     }
@@ -534,9 +536,9 @@ bool runSelfTests() {
                     if (trial.deaths > 0) break; // Failed attempt; try another timing.
                     const auto target = trial.platforms[index + 1].bounds;
                     if (trial.player.grounded
-                        && trial.player.position.x + trial.player.size.x > target.left
-                        && trial.player.position.x < target.left + target.width
-                        && abs(trial.player.position.y + trial.player.size.y - target.top) < 0.1f)
+                        && trial.player.position.x + trial.player.size.x > target.position.x
+                        && trial.player.position.x < target.position.x + target.size.x
+                        && abs(trial.player.position.y + trial.player.size.y - target.position.y) < 0.1f)
                         return true;
                 }
             }

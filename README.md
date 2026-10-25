@@ -1,6 +1,6 @@
 # AFTERLIGHT
 
-A C++23 / SFML rooftop parkour game built to be played **and** understood.
+A C++23 / SFML 3.1 rooftop parkour game built to be played **and** understood.
 Run through a neon city, chain jumps and air dashes, climb walls, collect
 light, and reach the end of the skyline. The visuals are drawn in code; the
 only bundled external asset is the openly licensed DejaVu Sans font.
@@ -9,38 +9,55 @@ only bundled external asset is the openly licensed DejaVu Sans font.
 
 ## Build and play
 
-You need a C++23-capable compiler, CMake 3.20 or newer, and **SFML 2.5 or
-2.6** development libraries. SFML 3 is a different API and is not supported
-by this source code. GCC 13 or newer, recent Clang, or Visual Studio 2022
-with a recent C++ toolset are sensible choices.
+This version uses **C++23 and SFML 3.1** (also compatible with later 3.x
+versions). It no longer uses the SFML 2 API. CMake 3.20 or newer and a
+C++23 compiler are required; GCC 14 or newer is recommended for the
+MSYS2 UCRT64 workflow.
 
-On Ubuntu or Debian:
+### Windows: MSYS2 UCRT64 + Embarcadero Dev-C++
+
+Follow the complete [Windows setup guide](docs/windows-ucrt64.md). It covers
+installing matching UCRT64 packages, using Dev-C++ as your editor, building,
+running, and fixing missing DLL or compiler errors. Use the UCRT64 GCC
+compiler even if Dev-C++ also bundles an older compiler.
+
+In the **MSYS2 UCRT64** terminal, update the system (reopen that same terminal
+and repeat if the update asks you to close it), then install the tools:
 
 ```sh
-sudo apt-get update
-sudo apt-get install g++ cmake libsfml-dev
+pacman -Syu
+pacman -S --needed mingw-w64-ucrt-x86_64-gcc mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-ninja mingw-w64-ucrt-x86_64-sfml
+cd /c/path/to/Project-alpha
+bash scripts/build-ucrt64.sh
+./build-ucrt64/afterlight.exe
+```
+
+The helper verifies that the UCRT64 tools are selected, builds all four C++
+files, copies the assets, and runs the headless physics checks. CMake requires
+SFML **3.1 or newer 3.x**; if your package mirror still supplies an older
+release, see the setup guide instead of mixing libraries from another
+compiler. To launch later from Explorer, double-click
+`scripts/run-ucrt64.bat`. Keep the installed `C:\msys64` toolchain available;
+this launcher supplies the runtime DLL path.
+
+### Other platforms
+
+Install SFML **3.1** development libraries with a matching compiler, or build
+that release from [official SFML source](https://github.com/SFML/SFML/tree/3.1.0).
+A distribution package named `libsfml-dev` may still be SFML 2.x: check its
+version before using it. From the folder containing this README:
+
+```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel 2
+ctest --test-dir build --output-on-failure
 ./build/afterlight
 ```
 
-Run those commands from the folder containing this README. The first two
-install development tools; the next two create the executable; the last
-one starts the game. A desktop display is needed to play interactively.
-
-On other systems, install SFML **2.x** using the official SFML installation
-instructions, then use the same two CMake build commands. If CMake cannot
-find the library, add `-DSFML_DIR=/path/to/SFML/lib/cmake/SFML` to the first
-command. On Windows, use SFML binaries that match your compiler and its
-architecture; a Visual Studio multi-configuration build also needs
-`cmake --build build --config Release`, with the program usually at
-`build/Release/afterlight.exe`. The matching SFML DLLs must be beside that
-executable or on `PATH`. Some package managers default to SFML 3; explicitly
-select a 2.x package rather than using the latest version blindly.
-
-The build copies `assets/` beside the executable. Keep that folder with the
-program when moving it. A source-folder fallback also allows development
-runs from another working directory.
+For a custom SFML installation, add
+`-DCMAKE_PREFIX_PATH=/path/to/your/sfml-install` when configuring CMake. The
+build copies `assets/` beside the executable. Keep that folder with the
+program. A graphical desktop/display is required for interactive play.
 
 ## Controls
 
@@ -67,6 +84,7 @@ the finish, then try a faster, cleaner run.
 ctest --test-dir build --output-on-failure
 ```
 
+On Windows, replace `build` with `build-ucrt64` and use `afterlight.exe`.
 These invoke the same built-in physics checks. They run without a window,
 so a desktop session is not needed. They exercise gameplay rules rather
 than only checking whether the project compiles. An interactive playthrough
@@ -96,23 +114,21 @@ Use `--mute` to start silently without opening an audio device, or combine
 `--title-screen` with `--screenshot title.png` to capture the title artwork.
 Enter while paused restarts the entire run; Escape resumes from that pause.
 
-### This prepared cloud workspace
+### Prepared cloud workspace
 
-The cloud machine uses user-local libraries because system packages cannot
-be installed as root here. They are already prepared outside the checkout:
+For development in this cloud machine, activate the separately installed
+SFML 3.1 tools and use a fresh build folder:
 
 ```sh
-source /workspace/.afterlight-tools/activate.sh
-cmake -S /workspace/Project-alpha -B /workspace/Project-alpha/build -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build /workspace/Project-alpha/build --parallel 2
-ctest --test-dir /workspace/Project-alpha/build --output-on-failure
+source /workspace/.sfml31-tools/activate.sh
+cmake -S /workspace/Project-alpha -B /workspace/Project-alpha/build-sfml31 -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build /workspace/Project-alpha/build-sfml31 --parallel 2
+ctest --test-dir /workspace/Project-alpha/build-sfml31 --output-on-failure
 ```
 
-For local rendering checks in this machine, use an available virtual display
-such as `DISPLAY=:99`. A virtual display proves that rendering works; to play
-with a keyboard and see the live window, build on a desktop or connect your
-own graphical desktop session. These cloud-specific paths are not required
-when following the ordinary desktop installation above.
+Those paths are specific to this cloud machine. On Windows, use the UCRT64
+instructions instead. A virtual display can validate rendering on a server;
+interactive play needs a graphical desktop.
 
 ## A beginner's map of the code
 

@@ -2,6 +2,8 @@
 /build/
 /build-*/
 /cmake-build-*/
+/physics-lab/build/
+/physics-lab/build-*/
 
 # IDE and operating-system files describe one person's machine.
 /.vs/

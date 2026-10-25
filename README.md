@@ -1,5 +1,10 @@
 # AFTERLIGHT
 
+**New: [FLUX / the physics playground](physics-lab/README.md)** — a separate
+C++23 / raylib 6.2 application with colorful particle collisions, tearable
+cloth, and orbital trails. It uses your installed UCRT64 raylib package and
+does not require SFML. Open `physics-lab/README.md` for its own build steps.
+
 A C++23 / SFML 3.1 rooftop parkour game built to be played **and** understood.
 Run through a neon city, chain jumps and air dashes, climb walls, collect
 light, and reach the end of the skyline. The visuals are drawn in code; the

@@ -13,6 +13,11 @@ of the novel's story.
 Veilbound is a separate application alongside Afterlight and FLUX. It uses
 your installed **raylib 6.2** package, not either SFML installation.
 
+The game opens in a **1600 × 1200** window. Its interface scales proportionally,
+with space above and below to preserve the artwork's aspect ratio. Mouse
+targets follow the scaled interface. You can resize the window or press `F11`
+for borderless fullscreen on your monitor.
+
 ![Veilbound title screen](docs/title.png)
 
 [Tactical battle preview](docs/battle.png) · [Campaign caseboard](docs/map.png)

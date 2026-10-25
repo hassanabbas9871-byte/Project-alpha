@@ -17,7 +17,11 @@ using namespace std;
 using namespace veil;
 
 namespace {
-constexpr int Width = 1440, Height = 900;
+// The desktop window opens at the requested 1600 by 1200 resolution.
+// Interface coordinates stay consistent while the final image scales to fit;
+// this preserves circular artwork and keeps every mouse target aligned.
+constexpr int WindowWidth = 1600, WindowHeight = 1200;
+constexpr int CanvasWidth = 1440, CanvasHeight = 900;
 struct Options {
     bool smoke{}, mute{};
     string screen{"battle"};
@@ -137,9 +141,9 @@ int main(int argc, char** argv) {
 
         SetTraceLogLevel(LOG_WARNING);
         SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
-        InitWindow(Width, Height, "VEILBOUND / The Ninth Bell");
+        InitWindow(WindowWidth, WindowHeight, "VEILBOUND / The Ninth Bell");
         if (!IsWindowReady()) throw runtime_error("Could not create the game window.");
-        SetWindowMinSize(1024, 640);
+        SetWindowMinSize(1024, 768);
         SetExitKey(KEY_NULL);
         SetTargetFPS(automated ? 0 : 60);
         {
@@ -147,7 +151,7 @@ int main(int argc, char** argv) {
             Audio audio(!automated && !options.mute);
             UiState ui;
             ui.interactive = !automated;
-            RenderTexture2D canvas = LoadRenderTexture(Width, Height);
+            RenderTexture2D canvas = LoadRenderTexture(CanvasWidth, CanvasHeight);
             if (canvas.id == 0) throw runtime_error("Could not allocate the game canvas.");
             SetTextureFilter(canvas.texture, TEXTURE_FILTER_BILINEAR);
             int frames = 0;
@@ -157,10 +161,10 @@ int main(int argc, char** argv) {
                 const float dt = automated ? 1.f / 30.f : min(GetFrameTime(), .1f);
                 ui.time += dt;
                 if (IsKeyPressed(KEY_F11)) ToggleBorderlessWindowed();
-                const float scale = min(static_cast<float>(GetScreenWidth()) / Width,
-                                        static_cast<float>(GetScreenHeight()) / Height);
-                const Vector2 offset{(GetScreenWidth() - Width * scale) / 2,
-                                     (GetScreenHeight() - Height * scale) / 2};
+                const float scale = min(static_cast<float>(GetScreenWidth()) / CanvasWidth,
+                                        static_cast<float>(GetScreenHeight()) / CanvasHeight);
+                const Vector2 offset{(GetScreenWidth() - CanvasWidth * scale) / 2,
+                                     (GetScreenHeight() - CanvasHeight * scale) / 2};
                 const Vector2 raw = GetMousePosition();
                 ui.mouse = {(raw.x - offset.x) / scale, (raw.y - offset.y) / scale};
                 ui.hovered = {-1, -1};
@@ -224,8 +228,8 @@ int main(int argc, char** argv) {
                 EndTextureMode();
                 BeginDrawing();
                 ClearBackground({6, 8, 14, 255});
-                DrawTexturePro(canvas.texture, {0, 0, static_cast<float>(Width), -static_cast<float>(Height)},
-                               {offset.x, offset.y, Width * scale, Height * scale}, {0, 0}, 0, WHITE);
+                DrawTexturePro(canvas.texture, {0, 0, static_cast<float>(CanvasWidth), -static_cast<float>(CanvasHeight)},
+                               {offset.x, offset.y, CanvasWidth * scale, CanvasHeight * scale}, {0, 0}, 0, WHITE);
                 EndDrawing();
                 ++frames;
                 if (!options.screenshot.empty()) {

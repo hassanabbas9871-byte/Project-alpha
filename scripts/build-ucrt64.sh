@@ -26,14 +26,31 @@ build_dir="$project_dir/build-ucrt64"
 ucrt_prefix=$(cygpath -m /ucrt64)
 compiler=$(cygpath -m "$(command -v g++)")
 
-# Show versions for useful bug reports. CMake enforces SFML >= 3.1 below;
-# pacman merely reports what the local MSYS2 package database has installed.
+# An optional argument selects a separate SFML installation. The default is
+# the MSYS2 package. Pin it explicitly so CMake cannot select some other copy.
+if (( $# > 1 )); then
+    echo 'Usage: bash scripts/build-ucrt64.sh [SFML-install-folder]' >&2
+    exit 1
+fi
+sfml_prefix=$(cygpath -u "${1:-/ucrt64}")
+if [[ ! -f "$sfml_prefix/lib/cmake/SFML/SFMLConfig.cmake" ]]; then
+    echo "No SFML CMake package in: $sfml_prefix/lib/cmake/SFML" >&2
+    echo 'Install UCRT64 SFML >= 3.1, or pass the prefix of a matching UCRT64 source build.' >&2
+    exit 1
+fi
+
+# Windows needs the selected installation's DLLs for CTest as well as play.
+# Prepending its bin folder prevents older package DLLs from winning on PATH.
+export PATH="$sfml_prefix/bin:$PATH"
+sfml_windows=$(cygpath -m "$sfml_prefix")
+printf 'Selected SFML installation: %s\n' "$sfml_windows"
 g++ --version
-pacman -Q mingw-w64-ucrt-x86_64-sfml
+pacman -Q mingw-w64-ucrt-x86_64-sfml || true
 cmake -S "$project_dir" -B "$build_dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=Release \
     "-DCMAKE_CXX_COMPILER=$compiler" \
-    "-DCMAKE_PREFIX_PATH=$ucrt_prefix"
+    "-DCMAKE_PREFIX_PATH=$sfml_windows;$ucrt_prefix" \
+    "-DAFTERLIGHT_SFML_ROOT=$sfml_windows"
 cmake --build "$build_dir" --parallel 2
 ctest --test-dir "$build_dir" --output-on-failure
 printf '\nBuild complete. Run: "%s/afterlight.exe"\n' "$build_dir"

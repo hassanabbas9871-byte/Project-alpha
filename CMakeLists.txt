@@ -6,7 +6,16 @@ project(Afterlight VERSION 2.0.0 LANGUAGES CXX)
 # SFML handles the operating-system details of graphics, windows, and sound.
 # This source uses SFML 3.1: capitalized component names and SFML:: targets
 # are part of its CMake interface. An older installed SFML will fail clearly.
-find_package(SFML 3.1 COMPONENTS Graphics Window System Audio REQUIRED)
+# The Windows helper pins this to the chosen install. Without a pin, CMake
+# can skip an older MSYS2 package and silently use an unrelated SFML elsewhere.
+set(AFTERLIGHT_SFML_ROOT "" CACHE PATH "Exact SFML installation prefix (optional)")
+if(AFTERLIGHT_SFML_ROOT)
+    set(SFML_DIR "${AFTERLIGHT_SFML_ROOT}/lib/cmake/SFML")
+    find_package(SFML 3.1 CONFIG COMPONENTS Graphics Window System Audio REQUIRED
+        PATHS "${SFML_DIR}" NO_DEFAULT_PATH)
+else()
+    find_package(SFML 3.1 COMPONENTS Graphics Window System Audio REQUIRED)
+endif()
 if(SFML_VERSION VERSION_GREATER_EQUAL 4)
     message(FATAL_ERROR "Afterlight supports SFML 3.1 and later 3.x releases, not SFML 4.")
 endif()

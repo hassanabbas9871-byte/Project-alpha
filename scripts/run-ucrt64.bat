@@ -10,6 +10,9 @@ if not exist "%MSYS2_ROOT%\ucrt64\bin\g++.exe" (
     exit /b 1
 )
 set "PATH=%MSYS2_ROOT%\ucrt64\bin;%PATH%"
+rem For a custom build, set SFML_ROOT to that same SFML installation folder.
+rem Its DLLs must come before any older MSYS2 SFML DLLs on PATH.
+if defined SFML_ROOT set "PATH=%SFML_ROOT%\bin;%PATH%"
 rem %~dp0 is the script's folder; pushd also supports a folder with spaces.
 pushd "%~dp0.." || exit /b 1
 if not exist "build-ucrt64\afterlight.exe" (

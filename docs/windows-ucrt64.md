@@ -64,6 +64,23 @@ copies the font assets, and runs the physics checks. It stops if the wrong
 compiler environment is selected or a build/test fails. Output goes in a
 separate `build-ucrt64` folder, so it cannot reuse an old SFML 2 build cache.
 
+The helper now pins SFML to `/ucrt64` by default. If that package is only
+3.0.2, configuration stops instead of silently finding a different 3.1
+installation elsewhere. Use the custom-source instructions below in that case.
+
+For an existing SFML 3.1 installation built with your matching UCRT64 GCC,
+you can explicitly select it (quote paths containing spaces):
+
+```sh
+bash scripts/build-ucrt64.sh "/c/Program Files (x86)/SFML"
+```
+
+The script adds this installation's `bin` directory to `PATH` **before**
+running tests. Its folder name does not prove its architecture or compiler
+compatibility; if it came from a different compiler, build SFML from source
+with your UCRT64 GCC instead. A successful compile alone does not establish
+that all runtime DLLs are available.
+
 ## 3. Run the game
 
 From the same UCRT64 terminal:
@@ -76,6 +93,14 @@ Alternatively, double-click `scripts/run-ucrt64.bat` in File Explorer. It
 adds `C:\msys64\ucrt64\bin` to the game's DLL search path. If MSYS2 is in a
 custom folder, set the `MSYS2_ROOT` environment variable or edit the default
 folder near the top of that batch file.
+
+If you built with a custom SFML prefix, set `SFML_ROOT` to that same Windows
+folder before using the batch launcher. From UCRT64 you can instead run:
+
+```sh
+export PATH="/c/Program Files (x86)/SFML/bin:$PATH"
+./build-ucrt64/afterlight.exe
+```
 
 Keep the `assets` folder beside `afterlight.exe`. The build copies it for
 you. This development launcher expects the installed UCRT64 runtime; moving
@@ -147,7 +172,8 @@ Both SFML's `bin` and UCRT64's `bin` must remain on `PATH` while running.
 
 | Message or symptom | What to check |
 | --- | --- |
-| `SFML 3.1` not found | Check `pacman -Q mingw-w64-ucrt-x86_64-sfml`. For a custom source install use its install prefix, not its source directory. |
+| `SFML 3.1` not found | Check `pacman -Q mingw-w64-ucrt-x86_64-sfml`. If it is 3.0.2, build 3.1 from source with UCRT64 GCC. For a custom install pass its prefix to the helper. |
+| CTest exits `0xc0000135` | Windows could not load a required DLL; the test did not reach game code. Put the selected SFML installation's `bin` on `PATH` before testing and running. A transitive dependency may also be missing. Run `./build-ucrt64/afterlight.exe --self-test` directly to see whether Windows names the missing DLL. |
 | Unknown `-std=c++23` | The selected compiler is too old. Check `which g++` and select the current UCRT64 GCC. |
 | `SFML/Graphics.hpp` not found | Build through CMake and install the UCRT64 SFML development package; do not compile one file in isolation. |
 | Missing `sfml-*.dll`, `libstdc++-6.dll`, or another DLL | Run inside UCRT64 or use the batch launcher. Check the SFML and GCC DLL folders on `PATH`. |

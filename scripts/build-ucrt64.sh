@@ -53,4 +53,10 @@ cmake -S "$project_dir" -B "$build_dir" -G Ninja \
     "-DAFTERLIGHT_SFML_ROOT=$sfml_windows"
 cmake --build "$build_dir" --parallel 2
 ctest --test-dir "$build_dir" --output-on-failure
+# Explorer does not inherit this terminal's PATH. Remember the exact Windows
+# DLL directories in plain text so the batch launcher can recreate it later.
+# These files stay inside the ignored build folder, never in Git.
+printf '%s\n' "$(cygpath -w "$sfml_prefix/bin")" > "$build_dir/sfml-bin.txt"
+printf '%s\n' "$(cygpath -w /ucrt64/bin)" > "$build_dir/ucrt-bin.txt"
 printf '\nBuild complete. Run: "%s/afterlight.exe"\n' "$build_dir"
+printf 'Or double-click scripts/run-ucrt64.bat in File Explorer.\n'

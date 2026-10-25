@@ -37,8 +37,10 @@ files, copies the assets, and runs the headless physics checks. CMake requires
 SFML **3.1 or newer 3.x**; if your package mirror still supplies an older
 release, see the setup guide instead of mixing libraries from another
 compiler. To launch later from Explorer, double-click
-`scripts/run-ucrt64.bat`. Keep the installed `C:\msys64` toolchain available;
-this launcher supplies the runtime DLL path.
+`scripts/run-ucrt64.bat`. The successful build saves the selected SFML and
+UCRT64 runtime folders for that launcher, including custom SFML installs.
+Keep those installed tools available. Rebuild once after updating an older
+copy of the helper; Explorer does not inherit your terminal's DLL search path.
 
 ### Other platforms
 

@@ -89,13 +89,26 @@ From the same UCRT64 terminal:
 ./build-ucrt64/afterlight.exe
 ```
 
-Alternatively, double-click `scripts/run-ucrt64.bat` in File Explorer. It
-adds `C:\msys64\ucrt64\bin` to the game's DLL search path. If MSYS2 is in a
-custom folder, set the `MSYS2_ROOT` environment variable or edit the default
-folder near the top of that batch file.
+Alternatively, double-click `scripts/run-ucrt64.bat` in File Explorer.
+After a successful build, the updated helper saves the chosen SFML and UCRT64
+DLL folders in `build-ucrt64/sfml-bin.txt` and `build-ucrt64/ucrt-bin.txt`.
+The launcher reads these paths automatically, including custom installations.
+This works without changing your global Windows PATH.
 
-If you built with a custom SFML prefix, set `SFML_ROOT` to that same Windows
-folder before using the batch launcher. From UCRT64 you can instead run:
+If you built before this launcher update, rerun the updated helper once:
+
+```sh
+bash scripts/build-ucrt64.sh "/c/Program Files (x86)/SFML"
+```
+
+Use the folder containing your actual matching SFML installation. Then open
+Explorer and double-click `scripts/run-ucrt64.bat`, rather than the raw EXE.
+Launching the EXE directly requires its DLLs beside it or on Windows PATH;
+the terminal's temporary PATH is not inherited by Explorer. The batch launcher
+supplies it just for this game. You may create a desktop shortcut to the batch file.
+
+The optional `SFML_ROOT` and `MSYS2_ROOT` environment variables override saved
+paths if necessary. From UCRT64 you can also run directly:
 
 ```sh
 export PATH="/c/Program Files (x86)/SFML/bin:$PATH"

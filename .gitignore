@@ -4,6 +4,8 @@
 /cmake-build-*/
 /physics-lab/build/
 /physics-lab/build-*/
+/veilbound/build/
+/veilbound/build-*/
 
 # IDE and operating-system files describe one person's machine.
 /.vs/

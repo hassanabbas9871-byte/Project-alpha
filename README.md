@@ -1,5 +1,10 @@
 # AFTERLIGHT
 
+**New RPG: [Veilbound: The Ninth Bell](veilbound/README.md)** — an original
+occult investigation campaign with eight chapters, 32 cases, 64 tactical
+encounters, three investigators, equipment, skills, choices and save files.
+It is a separate C++23/raylib 6.2 application in `veilbound`.
+
 **New: [FLUX / the physics playground](physics-lab/README.md)** — a separate
 C++23 / raylib 6.2 application with colorful particle collisions, tearable
 cloth, and orbital trails. It uses your installed UCRT64 raylib package and

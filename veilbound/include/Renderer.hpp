@@ -3,10 +3,12 @@
 // The renderer knows about graphics; the battle and campaign do not. This
 // boundary is why their tests can run without a window or a graphics driver.
 #include "Game.hpp"
+#include "Typography.hpp"
 #include <raylib.h>
 #include <filesystem>
 
 namespace veil {
+inline constexpr int UiWidth = 1440, UiHeight = 1080;
 inline constexpr int TileSize = 64;
 inline constexpr Rectangle BoardRect{278, 210, 768, 512};
 
@@ -27,11 +29,11 @@ public:
     ~Renderer();
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
-    void draw(Game& game, UiState& ui);
+    void draw(Game& game, UiState& ui, float scale = 1.f, Vector2 offset = {0,0}, float dpi = 1.f);
 
 private:
-    Font font_{};
-    bool ownsFont_{}, confirmNew_{};
+    Typography typography_;
+    bool confirmNew_{};
     int journalPage_{}, rewardPage_{};
     std::string rewardSeen_;
     void text(const std::string&, float x, float y, float size, Color color) const;

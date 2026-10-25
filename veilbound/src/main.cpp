@@ -18,10 +18,10 @@ using namespace veil;
 
 namespace {
 // The desktop window opens at the requested 1600 by 1200 resolution.
-// Interface coordinates stay consistent while the final image scales to fit;
-// this preserves circular artwork and keeps every mouse target aligned.
+// Geometry uses a logical 4:3 layout. Text is rasterized at the actual screen
+// pixel size, so it is never blurred by enlarging a small off-screen image.
 constexpr int WindowWidth = 1600, WindowHeight = 1200;
-constexpr int CanvasWidth = 1440, CanvasHeight = 900;
+constexpr int CanvasWidth = UiWidth, CanvasHeight = UiHeight;
 struct Options {
     bool smoke{}, mute{};
     string screen{"battle"};
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
         if (automated) { game.newGame(); setCapturePage(game, options.screen); }
 
         SetTraceLogLevel(LOG_WARNING);
-        SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
+        SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);
         InitWindow(WindowWidth, WindowHeight, "VEILBOUND / The Ninth Bell");
         if (!IsWindowReady()) throw runtime_error("Could not create the game window.");
         SetWindowMinSize(1024, 768);
@@ -151,9 +151,6 @@ int main(int argc, char** argv) {
             Audio audio(!automated && !options.mute);
             UiState ui;
             ui.interactive = !automated;
-            RenderTexture2D canvas = LoadRenderTexture(CanvasWidth, CanvasHeight);
-            if (canvas.id == 0) throw runtime_error("Could not allocate the game canvas.");
-            SetTextureFilter(canvas.texture, TEXTURE_FILTER_BILINEAR);
             int frames = 0;
             int displayedTurn = -1;
 
@@ -220,16 +217,12 @@ int main(int argc, char** argv) {
                     }
                 }
                 audio.update(dt, game.page == Page::Battle && !ui.paused);
-                // Two renders: first at a consistent logical size, then scaled
-                // into the actual window. The negative source height flips the
-                // OpenGL texture so the final picture is the correct way up.
-                BeginTextureMode(canvas);
-                renderer.draw(game, ui);
-                EndTextureMode();
+                // Draw geometry directly, then draw crisp text in screen space.
+                // The renderer uses the same viewport transform as mouse input.
                 BeginDrawing();
                 ClearBackground({6, 8, 14, 255});
-                DrawTexturePro(canvas.texture, {0, 0, static_cast<float>(CanvasWidth), -static_cast<float>(CanvasHeight)},
-                               {offset.x, offset.y, CanvasWidth * scale, CanvasHeight * scale}, {0, 0}, 0, WHITE);
+                const float dpi = static_cast<float>(GetRenderWidth()) / max(1, GetScreenWidth());
+                renderer.draw(game, ui, scale, offset, dpi);
                 EndDrawing();
                 ++frames;
                 if (!options.screenshot.empty()) {
@@ -248,7 +241,6 @@ int main(int argc, char** argv) {
             // Battles resume from their last encounter checkpoint, not a partial
             // turn. Game saves that checkpoint automatically on every victory.
             if (!automated && game.page != Page::Title) game.save();
-            UnloadRenderTexture(canvas);
         }
         CloseWindow();
         return 0;

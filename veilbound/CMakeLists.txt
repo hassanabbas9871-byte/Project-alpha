@@ -35,7 +35,7 @@ if(VEIL_BUILD_APP)
     # raylib draws the game and reads input. The other three implementation
     # files contain plain C++ systems which can also be tested without a window.
     add_executable(veilbound
-        src/main.cpp src/Renderer.cpp src/Content.cpp src/Battle.cpp src/Game.cpp src/Audio.cpp
+        src/main.cpp src/Renderer.cpp src/Typography.cpp src/Content.cpp src/Battle.cpp src/Game.cpp src/Audio.cpp
     )
     veil_compile_settings(veilbound)
     target_link_libraries(veilbound PRIVATE raylib)

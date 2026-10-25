@@ -13,10 +13,12 @@ of the novel's story.
 Veilbound is a separate application alongside Afterlight and FLUX. It uses
 your installed **raylib 6.2** package, not either SFML installation.
 
-The game opens in a **1600 × 1200** window. Its interface scales proportionally,
-with space above and below to preserve the artwork's aspect ratio. Mouse
-targets follow the scaled interface. You can resize the window or press `F11`
-for borderless fullscreen on your monitor.
+The game opens in a **1600 × 1200** window with a full 4:3 interface. Small
+labels are at least 20 screen pixels at that resolution; dialogue is larger.
+Fonts are rendered at native pixel sizes, with Windows DPI scaling accounted
+for, rather than enlarging a low-resolution picture of the interface. Cards,
+descriptions and the journal have more room, and disabled text keeps readable
+contrast. You can resize the window or press `F11` for borderless fullscreen.
 
 ![Veilbound title screen](docs/title.png)
 
@@ -211,6 +213,11 @@ launcher. On a Linux server use Xvfb for graphical checks. These are native
 desktop windows, not a browser game or localhost web preview.
 
 ## Read the code as a beginner
+
+`Typography.hpp` / `Typography.cpp` handle readable text: they cache fonts at
+their actual displayed size, measure the same glyphs used for wrapping, and
+draw them on the pixel grid after the geometry camera ends. The renderer uses
+that shared measurement for dialogue and reward pagination too.
 
 1. **`include/Types.hpp`** describes the shared data: heroes, enemies,
    equipment, skills, cases, battle units, and saved campaign progress.

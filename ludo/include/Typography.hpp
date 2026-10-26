@@ -1,8 +1,8 @@
 #pragma once
 
-// Text is rendered in real window pixels after the geometry camera has ended.
-// A separate atlas for each displayed size avoids shrinking one huge bitmap
-// font and then enlarging it again with the rest of the interface.
+// Text and board shapes use the SAME camera and logical coordinates. A separate
+// font atlas for each displayed pixel size keeps labels sharp without putting
+// them in a second drawing pass with a potentially different DPI transform.
 #include <raylib.h>
 #include <filesystem>
 #include <map>
@@ -20,7 +20,8 @@ public:
 
     // Begin one frame with the same scale/offset used by the geometry camera.
     // Positions supplied to add() and widths supplied to lines() stay logical.
-    // dpi is framebuffer pixels per window coordinate (Windows display scaling).
+    // scale*dpi is the camera's total zoom in framebuffer pixels. The offset is
+    // accepted as part of the shared API; only the camera applies its translation.
     void begin(float scale, Vector2 offset, float dpi = 1.f);
     float measure(const std::string& value, float requestedSize) const;
     float lineHeight(float requestedSize) const;
@@ -29,15 +30,15 @@ public:
                                    float requestedSize) const;
     void add(const std::string& value, float x, float y, float size, Color color) const;
 
-    // Call flush() after EndMode2D(). clear() discards obscured background text,
-    // for example before queuing the text in a modal pause dialog.
+    // Call flush() BEFORE EndMode2D(), while the board's camera is still active.
+    // clear() discards obscured background text, for example before a modal.
     void flush() const;
     void clear() const;
 
 private:
     struct Run {
         std::string value;
-        Vector2 position;
+        Vector2 position; // Logical board-space coordinates, just like shapes.
         int pixels{};
         Color color{};
     };
@@ -46,7 +47,6 @@ private:
     mutable std::vector<Run> runs_;
     float scale_{1.f};
     float dpi_{1.f};
-    Vector2 offset_{};
 
     int pixelSize(float requestedSize) const;
     const Font& font(int pixels) const;

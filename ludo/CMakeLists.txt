@@ -6,6 +6,9 @@ project(Ludo VERSION 1.0.0 LANGUAGES CXX)
 # Automated machines can exercise the actual rules without a graphics library.
 # Leave this option ON when you want the playable desktop application.
 option(LUDO_BUILD_APP "Build the graphical Ludo game" ON)
+# This test opens a graphics context. Enable it on a desktop or under Xvfb;
+# ordinary headless rules builds and Windows users do not need to enable it.
+option(LUDO_BUILD_DISPLAY_TESTS "Build the optional desktop rendering regression" OFF)
 include(CTest)
 
 # Both programs compile the same rules with the same C++23 language setting.
@@ -50,6 +53,19 @@ if(LUDO_BUILD_APP)
             "$<TARGET_FILE_DIR:ludo>/assets"
         COMMENT "Copying Ludo's readable font and its license"
     )
+
+    if(BUILD_TESTING AND LUDO_BUILD_DISPLAY_TESTS)
+        add_executable(ludo-display-tests
+            src/display-tests.cpp src/Typography.cpp src/Display.cpp src/Ludo.cpp
+        )
+        ludo_compile_settings(ludo-display-tests)
+        target_link_libraries(ludo-display-tests PRIVATE raylib)
+        target_compile_definitions(ludo-display-tests PRIVATE
+            LUDO_FONT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../assets/DejaVuSans.ttf"
+        )
+        add_test(NAME ludo_display COMMAND ludo-display-tests)
+        set_tests_properties(ludo_display PROPERTIES LABELS graphics)
+    endif()
 endif()
 
 if(BUILD_TESTING)

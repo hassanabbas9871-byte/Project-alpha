@@ -1,8 +1,26 @@
 #pragma once
 
+#include <raylib.h>
+
 // Window management is separate from the board layout. A large board design
 // should be allowed to fit a smaller laptop instead of forcing a large window.
 namespace ludo {
+
+// Width, height and mouse position all describe the actual drawable pixels.
+// On Windows these come directly from the same native client rectangle.
+struct Surface {
+    int width{}, height{};
+    Vector2 mouse{};
+};
+Surface displaySurface();
+
+// Replace inherited framework projection/DPI matrices with one pixel viewport.
+// Call after BeginDrawing(), before drawing either shapes or text.
+void beginNativeFrame(const Surface& surface);
+
+// The framework screenshot helper may use cached window sizes; capture the
+// actual viewport instead, which also supports display-regression checks.
+bool captureNativeFrame(const Surface& surface, const char* filename);
 
 // Call SetConfigFlags(...) first, including FLAG_WINDOW_HIDDEN. This creates
 // the window out of sight, fits it to the usable desktop, then makes it visible.

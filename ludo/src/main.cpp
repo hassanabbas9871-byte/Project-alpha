@@ -198,15 +198,14 @@ public:
         }
     }
 
-    void draw(float scale, Vector2 offset, float dpi, bool allowInput) {
-        mouse = {(GetMouseX() - offset.x) / scale, (GetMouseY() - offset.y) / scale};
+    void draw(float scale, Vector2 offset, Vector2 nativeMouse, bool allowInput) {
+        mouse = {(nativeMouse.x - offset.x) / scale, (nativeMouse.y - offset.y) / scale};
         input = allowInput && !paused && rulesPage < 0;
-        type.begin(scale, offset, dpi);
-        geometryScale = max(.01f, scale*dpi);
-        // raylib's BeginMode2D replaces its normal DPI matrix. Include the
-        // framebuffer ratio explicitly so geometry and the native text pass
-        // still agree on a Retina display or any non-1 framebuffer scale.
-        BeginMode2D(Camera2D{{offset.x*dpi,offset.y*dpi}, {0,0}, 0, scale*dpi});
+        type.begin(scale, offset);
+        geometryScale = max(.01f, scale);
+        // Shapes and labels use ONE camera in the actual pixel viewport.
+        // No second display/DPI transform is applied to labels afterward.
+        BeginMode2D(Camera2D{offset, {0,0}, 0, scale});
         ClearBackground(Background);
         text("LUDO", 30, 14, 42, Ink);
         text("/  ARCANA", 172, 24, 26, Quiet);
@@ -219,10 +218,8 @@ public:
         }
         if (paused && inMatch) pauseMenu();
         if (rulesPage >= 0) rulebook();
-        EndMode2D();
-        // Glyphs are drawn at native pixel size after the geometry camera.
-        // There is no low-resolution texture to blur when the window grows.
         type.flush();
+        EndMode2D();
     }
 
     bool inMatch{};
@@ -690,17 +687,19 @@ int main(int argc,char** argv) {
             while(!WindowShouldClose()) {
                 if(IsKeyPressed(KEY_F11)) toggleDisplayFullscreen();
                 if(IsKeyPressed(KEY_F9)) fitWindowToDesktop();
-                const float scale=min(GetScreenWidth()/Width,GetScreenHeight()/Height);
-                const Vector2 offset{(GetScreenWidth()-Width*scale)/2,(GetScreenHeight()-Height*scale)/2};
-                const float dpi=static_cast<float>(GetRenderWidth())/max(1,GetScreenWidth());
+                const Surface surface=displaySurface();
+                const float scale=min(surface.width/Width,surface.height/Height);
+                const Vector2 offset{(surface.width-Width*scale)/2,(surface.height-Height*scale)/2};
                 application.update(options.smoke ? .1f : min(GetFrameTime(),.1f),options.smoke);
                 BeginDrawing();
-                application.draw(scale,offset,dpi,!options.smoke && !capture);
+                beginNativeFrame(surface);
+                application.draw(scale,offset,surface.mouse,!options.smoke && !capture);
                 EndDrawing();
                 ++frames;
                 if(capture && frames==3) {
                     if(!options.screenshot.parent_path().empty()) filesystem::create_directories(options.screenshot.parent_path());
-                    TakeScreenshot(options.screenshot.string().c_str());
+                    if (!captureNativeFrame(surface,options.screenshot.string().c_str()))
+                        throw runtime_error("Could not save the screenshot.");
                 }
                 if((capture && frames>=4) || (options.smoke && frames>=600)) break;
             }

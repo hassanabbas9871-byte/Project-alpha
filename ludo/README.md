@@ -95,12 +95,14 @@ Use the visible die and cone controls to inspect legal moves. The event log
 explains deployments, captures, boosts, and finishing places. Enhanced modes
 also expose each cone's individual stats and active effects.
 
-The board, controls, text, and mouse targeting share the same display transform.
-The game uses native pixels rather than raylib's extra Windows window-enlarging
-DPI flag, so 125% or 150% Windows scaling does not enlarge the game past the
-desktop or separate labels from their shapes. You do not need to change your
-Windows display settings. F11 restores the previous window size when leaving
-fullscreen; F9 brings an oversized or displaced window back onto the desktop.
+The board, controls, and text are drawn through one camera in a native-pixel
+viewport. On Windows, the viewport and mouse coordinates come directly from
+the window's client rectangle, avoiding cached window sizes or separate text
+scaling. The game does not use the extra Windows window-enlarging DPI flag.
+You do not need to change your Windows display settings. F11 restores the
+previous window size when leaving fullscreen; F9 brings an oversized or
+displaced window back onto the desktop. The build helper recompiles every
+source file so an older renderer cannot remain in the build cache.
 
 ## Modes
 
@@ -199,6 +201,18 @@ The app also supports automated graphical checks:
 ./ludo/build/ludo --screenshot classes.png --mode classes
 ```
 
+An optional rendering regression checks the real lobby and match at three
+window sizes. It deliberately supplies an incorrect viewport and 125% scaling
+matrix, then verifies identical output, numbered cones, and centered captions:
+
+```sh
+cmake -S ludo -B ludo/build -DLUDO_BUILD_DISPLAY_TESTS=ON
+cmake --build ludo/build --parallel 2
+ctest --test-dir ludo/build --output-on-failure
+```
+
+This optional test requires a desktop or Xvfb; ordinary rules-only tests do not.
+
 Use `--mode basic|classes|anime|custom` to preselect a lobby mode, or
 `--demo` to open a demonstration board. Screenshot matches are labelled
 previews with arranged pieces; normal games start with every cone in base.
@@ -221,6 +235,8 @@ checks. The game is a native desktop program, not a browser application.
   bundled TrueType font at the displayed pixel size, avoiding blurry text.
 - **`src/tests.cpp`** checks rule behavior using the same implementation
   as the playable game.
+- **`src/display-tests.cpp`** checks actual rendered pixels, including recovery
+  from an incorrect inherited viewport or display-scaling matrix.
 - **`CMakeLists.txt`** tells CMake which files to compile and link together.
 
 Headers (`.hpp`) describe shared interfaces; source files (`.cpp`) supply

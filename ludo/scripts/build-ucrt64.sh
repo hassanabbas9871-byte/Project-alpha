@@ -37,7 +37,9 @@ cmake -S "$game_dir" -B "$build_dir" -G Ninja \
     "-DCMAKE_CXX_COMPILER=$compiler" \
     "-DCMAKE_PREFIX_PATH=$ucrt_prefix" \
     "-DLUDO_RAYLIB_ROOT=$ucrt_prefix"
-cmake --build "$build_dir" --parallel 2
+# ZIP extraction can preserve timestamps from an earlier download. Compile all
+# source files again so an old text renderer cannot survive in a cached object.
+cmake --build "$build_dir" --clean-first --parallel 2
 ctest --test-dir "$build_dir" --output-on-failure
 
 # File Explorer does not inherit the terminal's DLL search path. Save the

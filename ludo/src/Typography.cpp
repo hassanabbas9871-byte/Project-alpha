@@ -54,7 +54,9 @@ void Typography::begin(float scale, Vector2 offset, float dpi) {
     if (fonts_.size() > 48) unloadAtlases();
     scale_ = isfinite(scale) && scale > 0 ? scale : 1.f;
     dpi_ = isfinite(dpi) && dpi > 0 ? dpi : 1.f;
-    offset_ = offset;
+    // Translation belongs exclusively to the shared camera. Keeping labels in
+    // logical coordinates prevents a second, independent application of DPI.
+    (void)offset;
 }
 
 int Typography::pixelSize(float requestedSize) const {
@@ -145,16 +147,18 @@ vector<string> Typography::lines(const string& value, float logicalWidth, float 
 
 void Typography::add(const string& value, float x, float y, float size, Color color) const {
     if (value.empty()) return;
-    runs_.push_back({value, {round((offset_.x + x * scale_) * dpi_) / dpi_,
-                             round((offset_.y + y * scale_) * dpi_) / dpi_}, pixelSize(size), color});
+    runs_.push_back({value, {x, y}, pixelSize(size), color});
 }
 
 void Typography::flush() const {
-    // No camera or render texture should surround this pass. The atlas is
-    // sampled at its original size directly into the actual window framebuffer.
+    // The board's camera MUST still be active here. The font atlas was loaded
+    // at its final displayed pixel size; dividing the text's logical size and
+    // spacing by the camera zoom makes each atlas pixel one framebuffer pixel.
+    // Position is never pre-scaled: shapes and labels share one transformation.
+    const float zoom = scale_ * dpi_;
     for (const auto& run : runs_) {
         DrawTextEx(font(run.pixels), run.value.c_str(), run.position,
-                   static_cast<float>(run.pixels) / dpi_, PixelSpacing / dpi_, run.color);
+                   static_cast<float>(run.pixels) / zoom, PixelSpacing / zoom, run.color);
     }
     runs_.clear();
 }

@@ -19,6 +19,7 @@
 
 #include "Display.hpp"
 #include <raylib.h>
+#include <rlgl.h>
 
 #include <algorithm>
 #include <cmath>
@@ -114,6 +115,52 @@ void fit(int requestedWidth, int requestedHeight, bool center) {
 }
 } // namespace
 
+Surface displaySurface() {
+    Surface result;
+#if defined(_WIN32)
+    const HWND window = static_cast<HWND>(GetWindowHandle());
+    RECT client{};
+    POINT nativeCursor{};
+    if (GetClientRect(window, &client)) {
+        // GLFW makes the process DPI-aware. These are physical client pixels,
+        // independent of raylib's cached screen size and input scaling state.
+        result.width = max(1L, client.right - client.left);
+        result.height = max(1L, client.bottom - client.top);
+        if (GetCursorPos(&nativeCursor) && ScreenToClient(window, &nativeCursor))
+            result.mouse = {static_cast<float>(nativeCursor.x), static_cast<float>(nativeCursor.y)};
+        else result.mouse = {-10000,-10000}; // An unavailable cursor must not change the viewport.
+        return result;
+    }
+#endif
+    result.width = max(1, GetRenderWidth());
+    result.height = max(1, GetRenderHeight());
+    const Vector2 cursor = GetMousePosition();
+    result.mouse = {cursor.x * result.width / max(1, GetScreenWidth()),
+                    cursor.y * result.height / max(1, GetScreenHeight())};
+    return result;
+}
+
+void beginNativeFrame(const Surface& surface) {
+    // Flush any older batch before replacing its viewport. Thereafter the
+    // board camera is the only transformation used by BOTH shapes and labels.
+    rlDrawRenderBatchActive();
+    rlViewport(0, 0, surface.width, surface.height);
+    rlMatrixMode(RL_PROJECTION);
+    rlLoadIdentity();
+    rlOrtho(0, surface.width, surface.height, 0, -1, 1);
+    rlMatrixMode(RL_MODELVIEW);
+    rlLoadIdentity();
+}
+
+bool captureNativeFrame(const Surface& surface, const char* filename) {
+    Image pixels{rlReadScreenPixels(surface.width, surface.height), surface.width, surface.height,
+                 1, PIXELFORMAT_UNCOMPRESSED_R8G8B8A8};
+    if (!pixels.data) return false;
+    const bool saved = ExportImage(pixels, filename);
+    UnloadImage(pixels);
+    return saved;
+}
+
 void initializeDisplay(int preferredWidth, int preferredHeight) {
     // The small hidden window lets Windows report the real monitor and border
     // sizes before any oversized window can appear to the player.
@@ -127,15 +174,17 @@ void fitWindowToDesktop() {
     if (!IsWindowReady()) return;
     if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) toggleDisplayFullscreen();
     if (IsWindowMaximized()) RestoreWindow();
-    fit(GetScreenWidth(), GetScreenHeight(), true);
+    const Surface surface = displaySurface();
+    fit(surface.width, surface.height, true);
 }
 
 void toggleDisplayFullscreen() {
     if (!IsWindowReady()) return;
     const bool leaving = IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
     if (!leaving) {
-        normalWindow.width = GetScreenWidth();
-        normalWindow.height = GetScreenHeight();
+        const Surface surface = displaySurface();
+        normalWindow.width = surface.width;
+        normalWindow.height = surface.height;
         normalWindow.position = GetWindowPosition();
         normalWindow.recorded = true;
     }

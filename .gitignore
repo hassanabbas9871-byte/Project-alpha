@@ -6,6 +6,8 @@
 /physics-lab/build-*/
 /veilbound/build/
 /veilbound/build-*/
+/ludo/build/
+/ludo/build-*/
 
 # IDE and operating-system files describe one person's machine.
 /.vs/

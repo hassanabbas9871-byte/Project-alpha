@@ -1,5 +1,10 @@
 # AFTERLIGHT
 
+**New board game: [Ludo](ludo/README.md)** — simple four-color board visuals,
+one to four local human players, optional computer opponents, and Basic,
+Classes, Anime, and Custom rules. It is a separate C++23/raylib 6.2 game in
+`ludo`; its README has the Windows build and File Explorer launch steps.
+
 **New RPG: [Veilbound: The Ninth Bell](veilbound/README.md)** — an original
 occult investigation campaign with eight chapters, 32 cases, 64 tactical
 encounters, three investigators, equipment, skills, choices and save files.

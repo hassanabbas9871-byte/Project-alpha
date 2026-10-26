@@ -33,7 +33,7 @@ if(LUDO_BUILD_APP)
 
     # main.cpp owns the window and input, Typography.cpp draws readable text,
     # and Ludo.cpp owns the board-game rules.
-    add_executable(ludo src/main.cpp src/Typography.cpp src/Ludo.cpp)
+    add_executable(ludo src/main.cpp src/Typography.cpp src/Display.cpp src/Ludo.cpp)
     ludo_compile_settings(ludo)
     target_link_libraries(ludo PRIVATE raylib)
 

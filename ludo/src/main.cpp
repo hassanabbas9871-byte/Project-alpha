@@ -3,6 +3,7 @@
 // A beginner can read README.md first, then follow main() near the bottom.
 #include "Ludo.hpp"
 #include "Typography.hpp"
+#include "Display.hpp"
 #include <raylib.h>
 
 #include <algorithm>
@@ -21,10 +22,11 @@ using namespace std;
 using namespace ludo;
 
 namespace {
-// All positions below use this 1600 x 1200 drawing space. A camera fits it to
+// All positions below use this 1600 x 900 drawing space. A camera fits it to
 // a resized window; the mouse uses the inverse of that same transformation.
-constexpr float Width = 1600, Height = 1200, Cell = 56;
-constexpr Vector2 BoardOrigin{40, 210};
+// A landscape layout uses a 1080p laptop much better than a tall 4:3 layout.
+constexpr float Width = 1600, Height = 900, Cell = 42;
+constexpr Vector2 BoardOrigin{30, 155};
 constexpr Color Background{242, 241, 234, 255}, Ink{30, 41, 52, 255};
 constexpr Color Quiet{78, 92, 105, 255}, Line{192, 199, 198, 255};
 constexpr Color Paper{255, 255, 250, 255}, Accent{41, 76, 89, 255};
@@ -67,7 +69,7 @@ Vector2 conePosition(const Game& game, int player, int cone) {
     if (progress < 57) return cellCenter(homeCell(player, progress - 52));
     // Finished cones sit in their color's triangle rather than covering a path.
     const Vector2 middle = cellCenter({7, 7});
-    constexpr array<Vector2, 4> directions{{{-42,0},{0,-42},{42,0},{0,42}}};
+    constexpr array<Vector2, 4> directions{{{-31,0},{0,-31},{31,0},{0,31}}};
     return {middle.x + directions[player].x + (cone % 2 ? 8.f : -8.f),
             middle.y + directions[player].y + (cone / 2 ? 8.f : -8.f)};
 }
@@ -93,7 +95,7 @@ Vector2 displayedPosition(const Game& game, int player, int cone) {
         // Up to 16 cones may share a protected square. Four columns keep even
         // that unusual state selectable through the cone cards in the sidebar.
         const int columns = stack.size() <= 4 ? 2 : 4;
-        const float gap = columns == 2 ? 20.f : 11.f;
+        const float gap = columns == 2 ? 16.f : 9.f;
         position.x += (index % columns - (columns - 1) * .5f) * gap;
         const int rows = (static_cast<int>(stack.size()) + columns - 1) / columns;
         position.y += (index / columns - (rows - 1) * .5f) * gap;
@@ -200,12 +202,16 @@ public:
         mouse = {(GetMouseX() - offset.x) / scale, (GetMouseY() - offset.y) / scale};
         input = allowInput && !paused && rulesPage < 0;
         type.begin(scale, offset, dpi);
-        BeginMode2D(Camera2D{offset, {0,0}, 0, scale});
+        geometryScale = max(.01f, scale*dpi);
+        // raylib's BeginMode2D replaces its normal DPI matrix. Include the
+        // framebuffer ratio explicitly so geometry and the native text pass
+        // still agree on a Retina display or any non-1 framebuffer scale.
+        BeginMode2D(Camera2D{{offset.x*dpi,offset.y*dpi}, {0,0}, 0, scale*dpi});
         ClearBackground(Background);
-        text("LUDO", 40, 28, 54, Ink);
-        text("/  ARCANA", 204, 43, 31, Quiet);
-        text("A familiar board. A few extraordinary possibilities.", 42, 100, 23, Quiet);
-        if (button({1290,42,268,56}, "How to play", true)) rulesPage = 0;
+        text("LUDO", 30, 14, 42, Ink);
+        text("/  ARCANA", 172, 24, 26, Quiet);
+        text("A familiar board. A few extraordinary possibilities.", 32, 70, 22, Quiet);
+        if (button({1310,24,260,50}, "How to play", true)) rulesPage = 0;
         if (inMatch) match(); else lobby();
         if (allowInput && IsKeyPressed(KEY_ESCAPE)) {
             if (rulesPage >= 0) rulesPage = -1;
@@ -231,7 +237,13 @@ private:
     bool input{}, paused{}, quitConfirm{}, demonstrationBoard{};
     array<Class,4> selectedClasses{};
     Vector2 mouse{};
-    float time{}, aiTimer{}, animation{};
+    float time{}, aiTimer{}, animation{}, geometryScale{1};
+
+    float stroke(float logicalWidth = 1) const {
+        // Thin filled outlines can disappear when their width shrinks below a
+        // physical pixel. Keep them visible at fractional laptop-window scales.
+        return max(logicalWidth, 1.25f/geometryScale);
+    }
 
     void text(const string& value, float x, float y, float size = 22, Color color = Ink) {
         type.add(value, x, y, size, color);
@@ -245,13 +257,13 @@ private:
     }
     void panel(Rectangle area, Color color = Paper) {
         DrawRectangleRounded(area, .025f, 6, color);
-        DrawRectangleRoundedLinesEx(area, .025f, 6, 1, Line);
+        DrawRectangleRoundedLinesEx(area, .025f, 6, stroke(), Line);
     }
     bool button(Rectangle area, const string& label, bool enabled = true, bool active = false) {
         const bool hover = input && enabled && CheckCollisionPointRec(mouse, area);
         const Color fill = active ? Accent : hover ? Color{221,231,230,255} : Paper;
         DrawRectangleRounded(area, .12f, 5, fill);
-        DrawRectangleRoundedLinesEx(area, .12f, 5, active ? 2.f : 1.f, enabled ? Accent : Line);
+        DrawRectangleRoundedLinesEx(area, .12f, 5, stroke(active ? 2.f : 1.f), enabled ? Accent : Line);
         const float size = 21;
         text(label, area.x + (area.width - type.measure(label, size)) / 2,
              area.y + (area.height - type.fontSize(size)) / 2 - 2, size,
@@ -259,10 +271,10 @@ private:
         return hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
     }
     void counter(const string& label, int& value, int minimum, int maximum, float y) {
-        text(label, 960, y + 10, 23);
-        if (button({1290,y,58,48}, "-", value > minimum)) --value;
-        text(to_string(value), 1380, y + 8, 25);
-        if (button({1478,y,58,48}, "+", value < maximum)) ++value;
+        text(label, 724, y + 9, 24);
+        if (button({1250,y,64,44}, "-", value > minimum)) --value;
+        text(to_string(value), 1380, y + 7, 26);
+        if (button({1482,y,64,44}, "+", value < maximum)) ++value;
     }
 
     void setMode(Mode next) {
@@ -275,104 +287,103 @@ private:
     void lobby() {
         constexpr array<Mode,4> modes{Mode::Basic,Mode::Classes,Mode::Anime,Mode::Custom};
         for (int i = 0; i < 4; ++i)
-            if (button({40.f + i * 383, 148, 368, 48}, modeName(modes[i]), true, mode == modes[i])) setMode(modes[i]);
+            if (button({30.f + i * 389, 105, 374, 40}, modeName(modes[i]), true, mode == modes[i])) setMode(modes[i]);
         board(nullptr);
-        panel({922,210,636,840});
-        text("YOUR TABLE", 948, 232, 29);
-        counter("Local humans", humans, 1, 4, 286);
+        panel({700,155,870,632});
+        text("YOUR TABLE", 724, 175, 29);
+        counter("Local humans", humans, 1, 4, 220);
         computers = min(computers, 4 - humans);
-        counter("Computer rivals", computers, 0, 4 - humans, 345);
-        text(humans + computers == 1 ? "Solo: race against your own turn count." : "Humans share this screen; CPUs play automatically.", 960, 402, 20, Quiet);
-        text("Dice per turn", 960, 448, 23);
-        if (button({1232,438,140,50}, "One D6", true, diceCount == 1)) diceCount = 1;
-        if (button({1386,438,150,50}, "Two D6", true, diceCount == 2)) diceCount = 2;
-        text("Victory", 960, 512, 23);
-        if (button({1130,501,194,50}, "First cone", true, firstCone)) firstCone = true;
-        if (button({1338,501,198,50}, "All four cones", true, !firstCone)) firstCone = false;
+        counter("Computer rivals", computers, 0, 4 - humans, 275);
+        text(humans + computers == 1 ? "Solo: race against your own turn count." : "Humans share this screen; CPUs play automatically.", 724, 328, 22, Quiet);
+        text("Dice per turn", 724, 374, 24);
+        if (button({1120,363,200,45}, "One D6", true, diceCount == 1)) diceCount = 1;
+        if (button({1340,363,206,45}, "Two D6", true, diceCount == 2)) diceCount = 2;
+        text("Victory", 724, 430, 24);
+        if (button({1120,419,200,45}, "First cone", true, firstCone)) firstCone = true;
+        if (button({1340,419,206,45}, "All four cones", true, !firstCone)) firstCone = false;
 
         if (mode == Mode::Basic) {
-            text("THE ORIGINAL RECIPE", 960, 592, 23);
-            wrapped("Roll a 1 to bring each cone out. Pick a die, then pick any legal cone. Race around the board and into your home lane.", {960,635,552,160}, 25, Ink);
-            wrapped("No cards, class abilities, or cone bonuses. Captures and marked safe squares are on.", {960,820,552,130}, 23);
+            text("THE ORIGINAL RECIPE", 724, 492, 25);
+            wrapped("Roll a 1 to bring each cone out. Pick a die, then pick any legal cone. Race around the board and into your home lane.", {724,538,800,116}, 28, Ink);
+            wrapped("No cards, class abilities, or cone bonuses. Captures and marked safe squares are on.", {724,680,800,82}, 25);
         } else {
-            text(mode == Mode::Anime ? "CHOOSE YOUR DISCIPLINES" : "CHOOSE YOUR CLASSES", 960, 584, 23);
+            text(mode == Mode::Anime ? "CHOOSE YOUR DISCIPLINES" : "CHOOSE YOUR CLASSES", 724, 487, 24);
             for (int p = 0; p < humans + computers; ++p) {
-                const float y = 628.f + p * 58;
-                DrawCircle(974, static_cast<int>(y + 23), 9, Colors[p]);
-                text(string(ColorNames[p]) + (p >= humans ? " CPU" : " local"), 996, y + 10, 21);
-                if (button({1166,y,370,48}, className(selectedClasses[p], mode)))
+                const float y = 530.f + p * 51;
+                DrawCircle(740, static_cast<int>(y + 21), 9, Colors[p]);
+                text(string(ColorNames[p]) + (p >= humans ? " CPU" : " local"), 763, y + 8, 24);
+                if (button({1116,y,430,43}, className(selectedClasses[p], mode)))
                     selectedClasses[p] = static_cast<Class>((static_cast<int>(selectedClasses[p]) + 1) % 6);
             }
             if (mode == Mode::Anime) {
-                if (button({960,879,576,52}, AnimeNames[animePreset])) {
+                if (button({724,741,390,36}, AnimeNames[animePreset])) {
                     animePreset = (animePreset + 1) % 3;
                     powers = animePreset != 1;
                     traits = animePreset != 2;
                     captures = animePreset != 2;
                 }
                 const array<string,3> descriptions{
-                    "Aura: cards, unique traits, captures and six disciplines.",
-                    "Mecha: class systems and traits; no power-up cards.",
-                    "Spirit: cards and classes; peaceful racing, equal traits."};
-                wrapped(descriptions[animePreset], {960,947,552,80}, 21);
+                    "Cards, traits and captures.",
+                    "Traits and classes. No cards.",
+                    "Peaceful race. Equal traits."};
+                text(descriptions[animePreset], 1130, 749, 21);
             } else if (mode == Mode::Custom) {
                 // Each switch changes a real rule; the rules engine receives
                 // exactly these flags when Start Match is pressed.
-                const array<string,5> labels{"Power-ups", "Classes", "Cone traits", "Captures", "Safe cells"};
+                const array<string,5> labels{"Cards", "Classes", "Traits", "Captures", "Safety"};
                 array<bool*,5> switches{&powers,&classes,&traits,&captures,&safeSquares};
                 for (int i = 0; i < 5; ++i) {
-                    const float x = 960.f + (i % 3) * 193;
-                    const float y = 879.f + (i / 3) * 63;
-                    if (button({x,y,182,51}, labels[i], true, *switches[i])) *switches[i] = !*switches[i];
+                    const float x = 724.f + i * 165;
+                    if (button({x,741,155,39}, labels[i], true, *switches[i])) *switches[i] = !*switches[i];
                 }
             } else {
-                wrapped("Click a class to cycle it. During play, select a cone and use its class ability. The rulebook explains all six kits.", {960,886,555,120}, 23);
+                wrapped("Click a class to cycle it. Select a cone to use its ability during play.", {724,741,800,47}, 22);
             }
         }
         wrapped(mode == Mode::Basic ? "BASIC / Just dice, cones, and the race home." :
                 mode == Mode::Anime ? "ANIME / Three original tournament presets. No prior anime knowledge needed." :
                 mode == Mode::Custom ? "CUSTOM / Build a ruleset for your own table." :
                 "CLASSES / Six tabletop-inspired kits, four cone traits, and collectible cards.",
-                {42,1080,830,90}, 25, Ink);
-        if (button({922,1071,636,80}, humans + computers == 1 ? "Start solo time trial" : "Start match", true, true)) start();
+                {30,810,630,80}, 24, Ink);
+        if (button({700,810,870,60}, humans + computers == 1 ? "Start solo time trial" : "Start match", true, true)) start();
     }
 
     void board(const Game* state) {
-        panel({BoardOrigin.x - 2, BoardOrigin.y - 2, 844, 844});
+        panel({BoardOrigin.x - 2, BoardOrigin.y - 2, 15*Cell+4, 15*Cell+4});
         // The four large home bases match the supplied reference's layout.
         for (int p = 0; p < 4; ++p) {
             const int x = p == 1 || p == 2 ? 9 : 0, y = p >= 2 ? 9 : 0;
             const Rectangle outer{BoardOrigin.x + x * Cell, BoardOrigin.y + y * Cell, 6*Cell, 6*Cell};
             DrawRectangleRec(outer, Colors[p]);
-            DrawRectangleRounded({outer.x + 29, outer.y + 29, outer.width - 58, outer.height - 58}, .13f, 8, Paper);
+            DrawRectangleRounded({outer.x + 20, outer.y + 20, outer.width - 40, outer.height - 40}, .13f, 8, Paper);
             const bool active = state && p == state->current && !state->over && state->players[p].rank == 0;
             if (active) DrawRectangleLinesEx({outer.x + 8, outer.y + 8, outer.width - 16, outer.height - 16}, 4, WHITE);
             text(string(ColorNames[p]) + (state && p < static_cast<int>(state->players.size()) && state->players[p].computer ? " / CPU" : ""),
-                 outer.x + 48, outer.y + 46, 22, Colors[p]);
+                 outer.x + 28, outer.y + 26, 22, Colors[p]);
             for (int c = 0; c < 4; ++c) {
                 const Vector2 position = basePosition(p, c);
-                DrawCircleV(position, 27, ColorAlpha(Colors[p], .13f));
-                DrawCircleLinesV(position, 27, ColorAlpha(Colors[p], .6f));
+                DrawCircleV(position, 22, ColorAlpha(Colors[p], .13f));
+                DrawCircleLinesV(position, 22, ColorAlpha(Colors[p], .6f));
                 if (!state) drawCone(position, p, c, false, false, 0, 0);
             }
             if (state && p < static_cast<int>(state->players.size())) {
                 string bottom = state->players[p].rank > 0 ? "Place " + to_string(state->players[p].rank) :
                     state->config.classAbilities ? className(state->players[p].heroClass, state->config.mode) : "Roll 1 to deploy";
-                text(bottom, outer.x + 40, outer.y + 274, 20, Colors[p]);
-            } else if (state) text("Empty seat", outer.x + 88, outer.y + 274, 20, Quiet);
+                text(bottom, outer.x + 26, outer.y + 211, 20, Colors[p]);
+            } else if (state) text("Empty seat", outer.x + 48, outer.y + 211, 20, Quiet);
         }
         for (int i = 0; i < 52; ++i) {
             const Vector2 center = cellCenter(Track[i]);
             Color fill = Paper;
             if (i % 13 == 0) fill = ColorAlpha(Colors[i / 13], .2f);
-            DrawRectangleRec({center.x-28,center.y-28,56,56}, fill);
-            DrawRectangleLinesEx({center.x-28,center.y-28,56,56}, 1, Line);
+            DrawRectangleRec({center.x-Cell/2,center.y-Cell/2,Cell,Cell}, fill);
+            DrawRectangleLinesEx({center.x-Cell/2,center.y-Cell/2,Cell,Cell}, stroke(), Line);
             const bool safe = state ? state->config.safeSquares && state->safe(i) :
                 i % 13 == 0 || i % 13 == 8;
             if (safe) {
                 // A hollow diamond marks protected cells; it is a shape, not
                 // a font glyph that might be missing from a Windows font.
-                DrawPolyLines(center, 4, 13, 0, Quiet);
+                DrawPolyLines(center, 4, 10, 0, Quiet);
             } else if (state && (state->config.powerups || state->config.classAbilities) && Game::pickup(i)) {
                 DrawCircleV(center, 9, Color{128,78,170,255});
                 // Draw the sign immediately with the board. Queuing text here
@@ -382,17 +393,17 @@ private:
             }
             if (i % 13 == 0) {
                 // A small corner dot identifies the corresponding entry color.
-                DrawCircle(static_cast<int>(center.x-18), static_cast<int>(center.y-18), 4, Colors[i/13]);
+                DrawCircle(static_cast<int>(center.x-13), static_cast<int>(center.y-13), 3, Colors[i/13]);
             }
         }
         for (int p = 0; p < 4; ++p) for (int h = 0; h < 5; ++h) {
             const Vector2 center = cellCenter(homeCell(p,h));
-            DrawRectangleRec({center.x-28,center.y-28,56,56}, ColorAlpha(Colors[p], .3f));
-            DrawRectangleLinesEx({center.x-28,center.y-28,56,56}, 1, Colors[p]);
+            DrawRectangleRec({center.x-Cell/2,center.y-Cell/2,Cell,Cell}, ColorAlpha(Colors[p], .3f));
+            DrawRectangleLinesEx({center.x-Cell/2,center.y-Cell/2,Cell,Cell}, stroke(), Colors[p]);
         }
         const Vector2 middle = cellCenter({7,7});
-        const Vector2 tl{middle.x-84,middle.y-84}, tr{middle.x+84,middle.y-84};
-        const Vector2 bl{middle.x-84,middle.y+84}, br{middle.x+84,middle.y+84};
+        const Vector2 tl{middle.x-1.5f*Cell,middle.y-1.5f*Cell}, tr{middle.x+1.5f*Cell,middle.y-1.5f*Cell};
+        const Vector2 bl{middle.x-1.5f*Cell,middle.y+1.5f*Cell}, br{middle.x+1.5f*Cell,middle.y+1.5f*Cell};
         DrawTriangle(tl,bl,middle,Colors[0]);
         DrawTriangle(tr,tl,middle,Colors[1]);
         DrawTriangle(br,tr,middle,Colors[2]);
@@ -406,7 +417,7 @@ private:
         // Choose only the closest clicked cone once. Several circles in a stack
         // can overlap; processing each overlap would accidentally spend 2 dice.
         optional<int> clickedCone;
-        float closest = 26.f;
+        float closest = 21.f;
         if (input && humanTurn && IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
             for (int c = 0; c < 4; ++c) {
                 const Vector2 position = displayedPosition(*state, state->current, c);
@@ -429,7 +440,7 @@ private:
             const int target = progress < 0 ? 0 : progress + state->moveDistance(selectedDie, selectedCone);
             Vector2 landing = target < 52 ? cellCenter(Track[(state->current*13+target)%52]) :
                               target < 57 ? cellCenter(homeCell(state->current,target-52)) : middle;
-            DrawCircleLinesV(landing, 26 + 2 * sinf(time*4), Ink);
+            DrawCircleLinesV(landing, 20 + 2 * sinf(time*4), Ink);
         }
         if (clickedCone) {
             selectedCone = *clickedCone;
@@ -441,15 +452,15 @@ private:
     }
 
     void drawCone(Vector2 position, int player, int cone, bool legal, bool selected, int shields, int sprint) {
-        if (legal) DrawCircleV(position, 27 + 2*sinf(time*4), Color{255,224,123,255});
-        if (selected) DrawCircleLinesV(position, 29, Ink);
-        DrawCircleV({position.x+1,position.y+3}, 21, ColorAlpha(Ink,.2f));
-        DrawCircleV(position, 21, Colors[player]);
-        DrawCircleLinesV(position, 21, WHITE);
+        if (legal) DrawCircleV(position, 21 + 2*sinf(time*4), Color{255,224,123,255});
+        if (selected) DrawCircleLinesV(position, 23, Ink);
+        DrawCircleV({position.x+1,position.y+3}, 17, ColorAlpha(Ink,.2f));
+        DrawCircleV(position, 17, Colors[player]);
+        DrawCircleLinesV(position, 17, WHITE);
         const string number = to_string(cone+1);
         text(number, position.x - type.measure(number,23)/2, position.y - 14, 23, WHITE);
-        if (shields > 0) DrawCircleLinesV(position, 24, Color{85,206,234,255});
-        if (sprint > 0) DrawCircle(static_cast<int>(position.x+17), static_cast<int>(position.y-17), 6, Color{254,215,87,255});
+        if (shields > 0) DrawCircleLinesV(position, 20, Color{85,206,234,255});
+        if (sprint > 0) DrawCircle(static_cast<int>(position.x+13), static_cast<int>(position.y-13), 5, Color{254,215,87,255});
     }
 
     void die(Rectangle area, int index, bool humanTurn) {
@@ -458,8 +469,8 @@ private:
         const bool enabled = game->rolled && !spent && humanTurn;
         const bool hover = input && enabled && CheckCollisionPointRec(mouse,area);
         DrawRectangleRounded(area,.16f,8, spent ? Color{225,228,225,255} : chosen ? Color{225,237,234,255} : WHITE);
-        DrawRectangleRoundedLinesEx(area,.16f,8,chosen ? 3.f : 1.f,chosen ? Accent : Line);
-        if (game->rolled) {
+        DrawRectangleRoundedLinesEx(area,.16f,8,stroke(chosen ? 3.f : 1.f),chosen ? Accent : Line);
+        if (game->rolled && !spent) {
             const int value = animation > 0 ? 1 + static_cast<int>(time*24 + index*3)%6 : game->dice[index];
             const Vector2 center{area.x+area.width/2,area.y+area.height/2};
             const float spacing=20;
@@ -468,8 +479,12 @@ private:
             if (value>=2) { pip(-1,-1); pip(1,1); }
             if (value>=4) { pip(1,-1); pip(-1,1); }
             if (value==6) { pip(-1,0); pip(1,0); }
+        } else if (game->rolled) {
+            // A compact die cannot fit a bottom caption over its lower pips.
+            // Once spent, replace the face with a clear centered label.
+            text("USED",area.x+(area.width-type.measure("USED",21))/2,
+                 area.y+(area.height-type.fontSize(21))/2-2,21,Quiet);
         } else text("?", area.x+area.width/2-9, area.y+area.height/2-19,34,Quiet);
-        if (spent && game->rolled) text("USED",area.x+17,area.y+area.height-23,18,Quiet);
         if (hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedDie = index;
     }
 
@@ -484,46 +499,46 @@ private:
         auto& player = game->players[game->current];
         const bool humanTurn = !player.computer && !game->over && animation <= 0;
         text(modeName(game->config.mode) + "  /  " + to_string(game->config.diceCount) + " D6  /  " +
-             (game->config.firstConeWins ? "First cone home" : "All four home"), 42, 156, 24);
-        if (demonstrationBoard) text("DEMO BOARD", 1035, 160, 21, Quiet);
-        if (button({1324,145,234,50},"Pause / menu")) paused=true;
-        panel({922,210,636,840});
-        DrawCircle(956,249,10,Colors[game->current]);
-        text(game->over ? "RACE COMPLETE" : player.name + "'s turn", 980, 228, 29);
-        text("Turn " + to_string(game->turn) + (player.computer ? "  /  computer thinking" : "  /  your move"), 948, 273, 20, Quiet);
-        die({948,314,106,106},0,humanTurn);
-        if (game->config.diceCount==2) die({1072,314,106,106},1,humanTurn);
+             (game->config.firstConeWins ? "First cone home" : "All four home"), 30, 110, 24);
+        if (demonstrationBoard) text("DEMO BOARD", 1090, 112, 21, Quiet);
+        if (button({1330,102,240,42},"Pause / menu")) paused=true;
+        panel({700,155,870,632});
+        DrawCircle(737,193,10,Colors[game->current]);
+        text(game->over ? "RACE COMPLETE" : player.name + "'s turn", 760, 174, 29);
+        text("Turn " + to_string(game->turn) + (player.computer ? "  /  computer thinking" : "  /  your move"), 724, 216, 22, Quiet);
+        die({724,252,84,84},0,humanTurn);
+        if (game->config.diceCount==2) die({828,252,84,84},1,humanTurn);
         const string explanation = animation > 0 ? "Rolling..." : !game->rolled ? "Roll to begin this turn." : game->canEndTurn() ?
             "No legal dice remain. End turn." : "Pick a die, then click a cone.";
-        wrapped(explanation,{1200,316,324,102},22,Ink);
-        if (button({948,440,350,55}, game->rolled ? "Dice rolled" : "Roll dice", humanTurn && !game->rolled, !game->rolled)) {
+        wrapped(explanation,{940,266,580,70},26,Ink);
+        if (button({724,352,500,50}, game->rolled ? "Dice rolled" : "Roll dice", humanTurn && !game->rolled, !game->rolled)) {
             game->roll(); animation=.32f; selectUsableDie();
         }
-        if (button({1314,440,218,55},"End turn", humanTurn && game->canEndTurn())) { game->endTurn(); return; }
+        if (button({1240,352,306,50},"End turn", humanTurn && game->canEndTurn())) { game->endTurn(); return; }
         if (input && humanTurn && IsKeyPressed(KEY_SPACE)) {
             if (!game->rolled) { game->roll(); animation=.32f; selectUsableDie(); }
             else if (game->canEndTurn()) { game->endTurn(); return; }
         }
-        text("YOUR CONES",948,517,22);
+        text("YOUR CONES",724,416,23);
         for (int c=0;c<4;++c) {
-            const float y=556.f+c*77;
+            const float y=450.f+c*58;
             const auto& cone=player.cones[c];
             const bool legal=game->canMove(selectedDie,c);
             const bool selected=c==selectedCone;
-            const Rectangle card{948,y,584,66};
+            const Rectangle card{724,y,822,52};
             DrawRectangleRounded(card,.1f,5,selected ? Color{224,235,232,255} : Color{244,246,241,255});
             if(selected) DrawRectangleRoundedLinesEx(card,.1f,5,2,Accent);
-            DrawCircle(973,static_cast<int>(y+29),13,Colors[game->current]);
-            text(to_string(c+1),966,y+17,20,WHITE);
-            text(game->config.uniqueStats ? coneName(c) : "Cone " + to_string(c+1),1000,y+6,21);
-            const string location=cone.progress<0 ? "In base - needs 1" : cone.progress==57 ? "Finished" :
+            DrawCircle(747,static_cast<int>(y+25),14,Colors[game->current]);
+            text(to_string(c+1),740,y+11,20,WHITE);
+            text(game->config.uniqueStats ? coneName(c) : "Cone " + to_string(c+1),774,y+13,24);
+            const string location=cone.progress<0 ? "Base (roll 1)" : cone.progress==57 ? "Finished" :
                 cone.progress>=52 ? "Home lane " + to_string(cone.progress-51) + "/6" : "Circuit " + to_string(cone.progress) + "/52";
-            text(location,1000,y+35,19,Quiet);
-            if (button({1356,y+9,162,46},legal ? "Move " + to_string(game->moveDistance(selectedDie,c)) : selected ? "Selected" : "Select",humanTurn,selected)) {
+            text(location,1050,y+13,23,Quiet);
+            if (button({1378,y+5,156,42},legal ? "Move " + to_string(game->moveDistance(selectedDie,c)) : selected ? "Selected" : "Select",humanTurn,selected)) {
                 selectedCone=c;
                 if(legal) { game->move(selectedDie,c); selectUsableDie(); }
             }
-            if(input && humanTurn && CheckCollisionPointRec(mouse,{948,y,400,66}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedCone=c;
+            if(input && humanTurn && CheckCollisionPointRec(mouse,{724,y,635,52}) && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) selectedCone=c;
         }
         const auto& selected=player.cones[selectedCone];
         string stats="Cone " + to_string(selectedCone+1);
@@ -531,26 +546,26 @@ private:
         stats += "  /  Shield " + to_string(selected.shields) + "  Boost +" + to_string(selected.sprint);
         if (!game->config.uniqueStats && !game->config.powerups && !game->config.classAbilities)
             stats = "Identical cones / No class or movement bonuses.";
-        text(stats,948,875,19,Ink);
+        text(stats,724,690,23,Ink);
         if(game->config.classAbilities) {
-            const string label=className(player.heroClass,game->config.mode) + " ability  /  Energy: " + to_string(player.energy);
-            if(button({948,914,584,48},label,humanTurn && game->canUseAbility(selectedCone,selectedDie))) game->useAbility(selectedCone,selectedDie);
-        } else text("Select numbered cones on the board or the cards.",948,929,21,Quiet);
+            const string label=className(player.heroClass,game->config.mode) + " / E: " + to_string(player.energy);
+            if(button({724,730,340,45},label,humanTurn && game->canUseAbility(selectedCone,selectedDie))) game->useAbility(selectedCone,selectedDie);
+        } else text("Select a cone first.",724,743,22,Quiet);
         if(game->config.powerups) {
             for(int i=0;i<3;++i) {
                 const Power power=static_cast<Power>(i);
-                if(button({948.f+i*199,980,186,46},powerName(power)+" x"+to_string(player.cards[i]),
+                if(button({1076.f+i*160,730,150,45},powerName(power)+" x"+to_string(player.cards[i]),
                     humanTurn && game->canUsePower(power,selectedCone,selectedDie))) {
                     game->usePower(power,selectedCone,selectedDie); selectUsableDie();
                 }
             }
         } else text(!game->config.captures ? "No captures / Gold ring = legal move." :
-                    game->config.safeSquares ? "Safe diamond = protected. Gold ring = legal move." :
-                    "Safe squares off / Gold ring = legal move.",948,989,20,Quiet);
+                    game->config.safeSquares ? "Diamonds: safe. Gold ring: legal." :
+                    "Safety off. Gold ring: legal.",1076,743,21,Quiet);
         // The history keeps the last move visible even after a CPU passes.
-        text("TABLE LOG",42,1072,20,Quiet);
+        text("TABLE LOG",30,806,21,Quiet);
         for(int i=0;i<2 && i<static_cast<int>(game->history.size());++i)
-            wrapped(game->history[game->history.size()-1-i],{42,1105.f+i*36,1500,33},21,Ink);
+            wrapped(game->history[game->history.size()-1-i],{30,837.f+i*30,1520,30},22,Ink);
         if (game->over) results();
     }
 
@@ -596,61 +611,60 @@ private:
         panel(area);
     }
     void pauseMenu() {
-        overlay({430,310,740,560});
+        overlay({430,210,740,500});
         const bool old=input; input=rulesPage<0;
-        text(quitConfirm ? "Leave this match?" : "Take a breath",480,357,38);
+        text(quitConfirm ? "Leave this match?" : "Take a breath",480,250,38);
         wrapped(quitConfirm ? "Returning to the table ends this match. You can change every rule before starting again." :
-                "Pass the laptop to the next player, review the rules, or return to the table.", {480,426,630,110},25);
-        if(button({480,566,640,65},quitConfirm ? "Keep playing" : "Resume match",true,true)) { paused=false; quitConfirm=false; }
-        if(button({480,651,640,65},quitConfirm ? "End match and return to table" : "Return to table")) {
+                "Pass the laptop to the next player, review the rules, or return to the table.", {480,310,630,110},25);
+        if(button({480,440,640,55},quitConfirm ? "Keep playing" : "Resume match",true,true)) { paused=false; quitConfirm=false; }
+        if(button({480,515,640,55},quitConfirm ? "End match and return to table" : "Return to table")) {
             if(quitConfirm) { inMatch=false; paused=false; quitConfirm=false; }
             else quitConfirm=true;
         }
-        if(button({480,736,640,65},"How to play")) rulesPage=0;
+        if(button({480,590,640,55},"How to play")) rulesPage=0;
         input=old;
     }
     void results() {
-        overlay({390,270,820,660});
+        overlay({390,165,820,600});
         const bool old=input; input=rulesPage<0;
-        text("THE FINISHING TABLE",442,316,37);
-        text("Turns played: " + to_string(game->turn),442,375,24,Quiet);
+        text("THE FINISHING TABLE",442,205,37);
+        text("Turns played: " + to_string(game->turn),442,265,24,Quiet);
         for(int i=0;i<static_cast<int>(game->podium.size());++i) {
             const int p=game->podium[i];
-            DrawCircle(468,453+i*76,13,Colors[p]);
-            text(to_string(i+1)+".  "+game->players[p].name,500,434.f+i*76,29);
+            DrawCircle(468,339+i*70,13,Colors[p]);
+            text(to_string(i+1)+".  "+game->players[p].name,500,320.f+i*70,29);
         }
-        if(button({442,820,716,65},"Back to the table",true,true)) inMatch=false;
+        if(button({442,655,716,60},"Back to the table",true,true)) inMatch=false;
         input=old;
     }
     void rulebook() {
-        overlay({180,165,1240,920});
+        overlay({180,80,1240,750});
         const bool old=input; input=true;
-        text("THE POCKET RULEBOOK",224,204,34);
-        text(to_string(rulesPage+1)+" / 3",1260,215,24,Quiet);
+        text("THE POCKET RULEBOOK",224,106,34);
+        text(to_string(rulesPage+1)+" / 3",1260,110,24,Quiet);
         if(rulesPage==0) {
-            text("The race",224,280,29);
-            wrapped("Choose 1-4 local humans, then optionally fill spare seats with computer rivals. One seat alone is a turn-count time trial. Red starts; play continues clockwise.", {224,329,1140,130},25);
-            wrapped("Roll one or two six-sided dice. Each die is a separate move: choose a die, then choose any of your four cones. A raw 1 is required EVERY time you bring a cone out of base. Deployment uses that die and places the cone on its colored entrance.", {224,466,1140,170},25);
-            wrapped("Travel clockwise through all 52 outer squares, then along your own five colored home squares into the center. You need the exact roll to finish. A 6 gives no extra turn. When no legal die remains, press End turn or Space.", {224,662,1140,170},25);
-            wrapped("Bring all four cones home to earn your place. Choose First cone in the lobby for a shorter race. Ranked players leave the race; the last remaining player takes the final place. Matches continue after first place.", {224,843,1140,130},24);
+            text("The race",224,174,29);
+            wrapped("Choose 1-4 local humans, then optionally fill spare seats with computer rivals. One seat alone is a turn-count time trial. Red starts; play continues clockwise.", {224,220,1140,100},24);
+            wrapped("Roll one or two six-sided dice. Each die is a separate move: choose a die, then choose any of your four cones. A raw 1 is required EVERY time you bring a cone out of base. Deployment uses that die and places the cone on its colored entrance.", {224,330,1140,130},24);
+            wrapped("Travel clockwise through all 52 outer squares, then along your own five colored home squares into the center. You need the exact roll to finish. A 6 gives no extra turn. When no legal die remains, press End turn or Space.", {224,475,1140,130},24);
+            wrapped("Bring all four cones home to earn your place. Choose First cone in the lobby for a shorter race. Ranked players leave the race; the last remaining player takes the final place. Matches continue after first place.", {224,620,1140,110},24);
         } else if(rulesPage==1) {
-            text("Cards, cones & contact",224,280,29);
-            wrapped("Land on an unprotected enemy square to send its cones back to base. Diamond cells are safe when that rule is enabled. Sharing a square is allowed; stacks never form a blockade. Home lanes belong only to their matching color.", {224,329,1140,145},24);
-            wrapped("In enhanced modes, purple pickup cells grant a random card (up to 3 of each). Shield protects a cone from one capture. Sprint adds a one-use movement boost. Reroll replaces the selected unused die once per turn. Cards never turn a different number into a deployment 1.", {224,490,1140,170},24);
-            wrapped("Scout, Sentinel, Fortune and Balanced are the four cone traits. Speed improves activated Sprint, Guard supplies protection on deployment, and Luck adds pickup energy. Read the selected cone's numeric stats, shield count and pending boost in the sidebar.", {224,678,1140,145},24);
-            wrapped("Roll before using cards or class abilities. Most abilities cost 2 energy; Cleric costs 3, Monk costs 1. Use at most one per turn. Energy regenerates on later turns (maximum 6). Basic disables these extras, leaving identical cones and ordinary dice.", {224,842,1140,130},24);
+            text("Cards, cones & contact",224,174,29);
+            wrapped("Land on an unprotected enemy square to send its cones back to base. Diamond cells are safe when enabled. Stacks never form a blockade. Home lanes belong only to their matching color.", {224,220,1140,100},24);
+            wrapped("Purple cells grant a card: Shield blocks one capture, Sprint boosts one move, Reroll replaces an unused die once per turn. Cards never deploy a cone without a 1. Mecha cells restore energy without cards.", {224,330,1140,130},24);
+            wrapped("Scout, Sentinel, Fortune and Balanced are the four cone traits. Speed improves Sprint, Guard supplies shields on deployment, and Luck adds pickup energy. Read the selected cone's stats, shield count and boost in the sidebar.", {224,475,1140,130},24);
+            wrapped("Roll before using cards or abilities. Most abilities cost 2 energy; Cleric costs 3, Monk costs 1. Use at most one per turn. Energy returns on later turns (maximum 6). Basic disables these extras.", {224,620,1140,110},24);
         } else {
-            text("Six ways to bend the race",224,280,29);
+            text("Six ways to bend the race",224,174,29);
             for(int i=0;i<6;++i) {
-                const float x=224.f+(i%2)*590, y=338.f+(i/2)*196;
+                const float x=224.f+(i%2)*590, y=220.f+(i/2)*166;
                 text(className(static_cast<Class>(i),mode==Mode::Anime ? Mode::Anime : Mode::Classes),x,y,26);
-                wrapped(classDescription(static_cast<Class>(i),mode==Mode::Anime ? Mode::Anime : Mode::Classes),{x,y+45,540,135},23);
+                wrapped(classDescription(static_cast<Class>(i),mode==Mode::Anime ? Mode::Anime : Mode::Classes),{x,y+45,540,110},23);
             }
-            wrapped("Anime offers Aura League (all extras), Mecha Circuit (no cards), and Spirit Festival (no captures or distinct traits). Custom lets you toggle each system independently.", {224,936,1140,75},22);
         }
-        if(button({224,1015,200,48},"Previous",rulesPage>0)) --rulesPage;
-        if(button({440,1015,200,48},"Next",rulesPage<2)) ++rulesPage;
-        if(button({1120,1015,250,48},"Back to game",true,true)) rulesPage=-1;
+        if(button({224,765,200,45},"Previous",rulesPage>0)) --rulesPage;
+        if(button({440,765,200,45},"Next",rulesPage<2)) ++rulesPage;
+        if(button({1120,765,250,45},"Back to game",true,true)) rulesPage=-1;
         input=old;
     }
 };
@@ -661,10 +675,11 @@ int main(int argc,char** argv) {
         const Options options=arguments(argc,argv);
         const bool capture=!options.screenshot.empty();
         SetTraceLogLevel(LOG_WARNING);
-        SetConfigFlags(FLAG_WINDOW_RESIZABLE|FLAG_MSAA_4X_HINT|FLAG_WINDOW_HIGHDPI);
-        InitWindow(static_cast<int>(Width),static_cast<int>(Height),"LUDO / ARCANA");
-        if(!IsWindowReady()) throw runtime_error("The game could not open a window.");
-        SetWindowMinSize(1200,900);
+        // GLFW already makes Windows DPI-aware. Its extra HIGHDPI flag in
+        // raylib 6.2 enlarges this window again at 125/150% desktop scaling.
+        // Native pixels keep shapes, TrueType text and input in the same units.
+        SetConfigFlags(FLAG_WINDOW_RESIZABLE|FLAG_MSAA_4X_HINT|FLAG_WINDOW_HIDDEN);
+        initializeDisplay(1920,1080);
         SetExitKey(KEY_NULL); // Escape opens our menu instead of closing instantly.
         SetTargetFPS(options.smoke || capture ? 0 : 60);
         {
@@ -673,7 +688,8 @@ int main(int argc,char** argv) {
             if(options.demo || options.smoke || (capture && options.screen=="match")) application.start(capture || options.demo);
             int frames=0;
             while(!WindowShouldClose()) {
-                if(IsKeyPressed(KEY_F11)) ToggleBorderlessWindowed();
+                if(IsKeyPressed(KEY_F11)) toggleDisplayFullscreen();
+                if(IsKeyPressed(KEY_F9)) fitWindowToDesktop();
                 const float scale=min(GetScreenWidth()/Width,GetScreenHeight()/Height);
                 const Vector2 offset{(GetScreenWidth()-Width*scale)/2,(GetScreenHeight()-Height*scale)/2};
                 const float dpi=static_cast<float>(GetRenderWidth())/max(1,GetScreenWidth());

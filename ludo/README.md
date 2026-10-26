@@ -6,8 +6,10 @@ computer**, add computer opponents up to four total seats, or play a solo
 race. Each player has four numbered cones.
 
 The board follows the familiar red, blue, yellow, and green layout in the
-reference image. The game opens at **1600 × 1200** and supports resizing and
-borderless fullscreen. This is a separate **raylib 6.2** application; it
+reference image. The landscape interface is optimized for a **1920 × 1080**
+laptop display. The window automatically fits inside the available desktop,
+accounting for the Windows taskbar, title bar, and borders. It also supports
+resizing and borderless fullscreen. This is a separate **raylib 6.2** application; it
 does not require SFML and does not replace the repository's other games.
 
 ![Ludo match](docs/match.png)
@@ -86,11 +88,19 @@ player completes the selected goal.
 | Mouse | Choose setup options, dice, cones, and available abilities |
 | `Space` | Roll, or end the turn when allowed |
 | `Escape` | Pause / resume; return to the lobby through the pause menu |
+| `F9` | Fit and center the window inside the available desktop |
 | `F11` | Toggle borderless fullscreen |
 
 Use the visible die and cone controls to inspect legal moves. The event log
 explains deployments, captures, boosts, and finishing places. Enhanced modes
 also expose each cone's individual stats and active effects.
+
+The board, controls, text, and mouse targeting share the same display transform.
+The game uses native pixels rather than raylib's extra Windows window-enlarging
+DPI flag, so 125% or 150% Windows scaling does not enlarge the game past the
+desktop or separate labels from their shapes. You do not need to change your
+Windows display settings. F11 restores the previous window size when leaving
+fullscreen; F9 brings an oversized or displaced window back onto the desktop.
 
 ## Modes
 
@@ -205,6 +215,8 @@ checks. The game is a native desktop program, not a browser application.
   Keeping rules independent lets tests exercise real moves without a window.
 - **`src/main.cpp`** opens the window, receives mouse and keyboard input,
   draws the board, and asks the rules to make legal moves.
+- **`include/Display.hpp` / `src/Display.cpp`** fit the window to the real
+  desktop work area and safely restore its size after fullscreen.
 - **`include/Typography.hpp` / `src/Typography.cpp`** measure and draw the
   bundled TrueType font at the displayed pixel size, avoiding blurry text.
 - **`src/tests.cpp`** checks rule behavior using the same implementation
@@ -230,6 +242,7 @@ at the repository root and beside the built executable.
 | raylib is not found | Check `pacman -Q mingw-w64-ucrt-x86_64-raylib`; use the matching UCRT64 package. |
 | Explorer reports a missing DLL or `0xc0000135` | Complete a build and use `scripts/run-ucrt64.bat`. |
 | Text/font does not load | Keep the complete source repository and the built `assets` folder. |
+| Window extends off screen | Rebuild the updated source, then press `F9` to fit the current desktop. |
 | Undefined references | Build the CMake project instead of compiling only `main.cpp`. |
 | Wrong compiler remains selected | Use a fresh build folder after changing compiler installations. |
 

@@ -10,7 +10,7 @@ using namespace std;
 
 namespace ludo {
 namespace {
-constexpr float MinimumSize = 20.f; // At the default window, even small labels are 20 pixels.
+constexpr float MinimumSize = 24.f; // Landscape panels leave room for larger labels.
 constexpr float PixelSpacing = 1.f;
 
 // A UTF-8 character may occupy several bytes. Long words must be broken at a
@@ -62,7 +62,9 @@ int Typography::pixelSize(float requestedSize) const {
     // Integer glyph sizes and pixel-snapped drawing prevent a second soft,
     // fractional resampling step. The upper bound also avoids absurd atlases
     // if a caller accidentally supplies a wildly incorrect viewport scale.
-    return static_cast<int>(clamp(round(logical * scale_ * dpi_), 1.f, 512.f));
+    // Smaller desktop windows still get readable labels. Measurement uses this
+    // same size, so wrapping and button centering include the actual glyphs.
+    return static_cast<int>(clamp(round(logical * scale_ * dpi_), 18.f, 512.f));
 }
 
 const Font& Typography::font(int pixels) const {
